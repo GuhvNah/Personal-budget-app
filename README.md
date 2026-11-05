@@ -26,7 +26,11 @@ A private, offline personal budgeting app. It's a Progressive Web App you instal
 
   Obvious matches are applied automatically and tagged **rule**, **transfer** or **auto**. When it's less sure, it shows **"Suggested: X"**: tap **Approve**, or choose a different category. **Approve all** handles a whole import at once.
 - **To review list:** uncategorised transactions, including ones imported earlier, appear under **Transactions → To review** with suggestions. A badge on the Transactions tab shows how many are waiting.
-- **Rules:** when you choose a different category, the app offers to make it a rule and apply it to matching uncategorised transactions.
+- **Apply to past transactions:** when you choose a category for a transaction, a sheet offers two switches:
+  - **Update existing transactions** (on by default) moves other transactions from the same merchant to that category. When you also create a rule, it moves every transaction matching the rule's text instead. It never changes transactions you categorised yourself, and it tells you how many will change and how many it's leaving alone.
+  - **Also create a rule** (off by default), with editable text. It suggests the merchant name without the store number, e.g. "WOOLWORTHS".
+
+  Adding a rule in **Settings → Rules** has the same "Apply to existing transactions" switch, with a live count.
 - **Transfers between your own accounts:** "Transfer to/from xxNNNN" to an account you've marked as yours goes in **Transfers**. That category isn't counted as spending or income. The review screen asks about account numbers it hasn't seen before.
 - **Outgoings donut chart:** the inner ring splits spending into **Necessary** (blue) and **Unnecessary** (orange). The outer ring shows the categories within each. Spending that isn't categorised yet is grey, under "Not sorted yet". Choose **Month**, **Quarter**, **6 months** or **Year** (calendar periods) and step back and forward with the arrows. Tap a slice to see its amount in the middle, or a row to open its transactions.
   - Each spending category is marked Necessary or Unnecessary. Tap the label in **Settings → Categories** to switch it. The defaults are: necessary for Rent/Mortgage, Bills, Insurance, Groceries, Fuel and Childcare; unnecessary for Eating Out, Entertainment and Other.

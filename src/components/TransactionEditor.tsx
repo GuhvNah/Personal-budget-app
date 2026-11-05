@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { ruleMatches } from '../lib/categorise';
 import * as db from '../lib/db';
 import { todayISO } from '../lib/dates';
 import { newId } from '../lib/id';
 import { centsToInput, dollarsToCents } from '../lib/money';
 import type { Category, Transaction } from '../lib/types';
 import { useStore } from '../store';
-import { RulePrompt } from './RulePrompt';
+import { ApplySheet, choiceSummary, commitChoice } from './ApplySheet';
+import { planRetro } from '../lib/retro';
 import { CategoryPicker } from './CategoryPicker';
 import { categoryNecessity } from '../lib/outgoings';
 import type { Necessity } from '../lib/types';
@@ -23,12 +23,10 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
   const [amount, setAmount] = useState(tx ? centsToInput(tx.amount) : '');
   const [direction, setDirection] = useState<'out' | 'in'>(tx && tx.amount > 0 ? 'in' : 'out');
   const [categoryId, setCategoryId] = useState<string | null>(tx?.categoryId ?? null);
-  // True when the category came from approving the app's suggestion.
-  const [approved, setApproved] = useState(false);
   const [accountId, setAccountId] = useState(tx?.accountId ?? accounts[0]?.id ?? MANUAL_ACCOUNT_ID);
   const [notes, setNotes] = useState(tx?.notes ?? '');
   const [necessity, setNecessity] = useState<Necessity | undefined>(tx?.necessity);
-  const [rulePrompt, setRulePrompt] = useState<{ description: string; category: Category } | null>(null);
+  const [applyPrompt, setApplyPrompt] = useState<{ tx: Transaction; category: Category } | null>(null);
   const [error, setError] = useState('');
 
   const cents = dollarsToCents(amount);
@@ -73,8 +71,8 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
 
     const changed = categoryId && categoryId !== (tx?.categoryId ?? null);
     const cat = categories.find((c) => c.id === categoryId);
-    if (changed && cat && !approved) {
-      setRulePrompt({ description: saved.description, category: cat });
+    if (changed && cat) {
+      setApplyPrompt({ tx: saved, category: cat });
     } else onClose();
   }
 
@@ -86,21 +84,21 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
     onClose();
   }
 
-  if (rulePrompt) {
-    const others = (p: string) =>
-      transactions.filter((t) => t.categoryId === null && ruleMatches({ pattern: p } as never, t.description));
+  if (applyPrompt) {
+    const { tx: saved, category } = applyPrompt;
     return (
-      <RulePrompt
-        description={rulePrompt.description}
-        category={rulePrompt.category}
-        countMatches={(p) => others(p).length}
-        onCreate={async (pattern, apply) => {
-          await db.putRule({ id: newId(), pattern, categoryId: rulePrompt.category.id, createdAt: Date.now() });
-          if (apply) {
-            await db.putTransactions(others(pattern).map((t) => ({ ...t, categoryId: rulePrompt.category.id })));
-          }
+      <ApplySheet
+        description={saved.description}
+        category={category}
+        plan={(by) => {
+          const r = planRetro(transactions, by, category.id, (t) => t.id === saved.id);
+          return { change: r.change.length, skipped: r.skipped };
+        }}
+        onConfirm={async (choice) => {
+          const changed = await commitChoice(choice, category.id, saved.id);
           await store.reload();
-          store.toast('Rule created');
+          const msg = choiceSummary(changed, choice.rule);
+          if (msg) store.toast(msg);
         }}
         onClose={onClose}
       />
@@ -160,14 +158,8 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
           value={categoryId}
           source={categoryId === tx?.categoryId ? tx?.categorySource : 'user'}
           suggestion={suggestion}
-          onApprove={(id) => {
-            setCategoryId(id);
-            setApproved(true);
-          }}
-          onChange={(id) => {
-            setCategoryId(id);
-            setApproved(false);
-          }}
+          onApprove={setCategoryId}
+          onChange={setCategoryId}
         />
       </div>
       {direction === 'out' && (!currentCat || currentCat.kind === 'expense') && (

@@ -85,6 +85,8 @@ describe('categorise', () => {
     expect(suggestPattern('Direct Debit 123456 BUDGET DIRECT')).toBe('BUDGET DIRECT');
     expect(suggestPattern('Transfer to xx1111 CommBank app')).toBe('xx1111');
     expect(suggestPattern('ALDI STORES - PERTH AU')).toBe('ALDI STORES - PERTH');
+    expect(suggestPattern('WOOLWORTHS 4021 PERTH AU')).toBe('WOOLWORTHS');
+    expect(suggestPattern('JIMS MOWING #12 MIDVALE')).toBe('JIMS MOWING');
   });
 });
 

@@ -63,5 +63,7 @@ export function suggestPattern(description: string): string {
   const xx = /\bxx\d{4}\b/i.exec(s);
   if (xx) return xx[0];
   s = s.replace(/\s+(value date:.*|aus card.*|au\b.*|\d[\d\s]{5,}.*)$/i, '');
+  // Stop at a store number so the rule matches every branch: "WOOLWORTHS 4021 PERTH" -> "WOOLWORTHS".
+  s = s.replace(/\s+#?\d+\b.*$/, '');
   return s.split(' ').slice(0, 4).join(' ');
 }
