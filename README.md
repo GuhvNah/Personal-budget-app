@@ -50,7 +50,7 @@ The workflow in `.github/workflows/deploy.yml` runs the tests, builds the app an
 1. Merge this branch into `main`.
 2. On GitHub, open the repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**. You only do this once.
 3. On a free GitHub plan, Pages needs the repository to be **public**. That's safe: the repo only contains code, and your data never leaves your phone.
-4. Watch the **Actions** tab. When the run goes green, the site URL appears under **Settings → Pages**. It will look like `https://<your-username>.github.io/personal-budget-app/`.
+4. Watch the **Actions** tab. When the run goes green, the site URL appears under **Settings → Pages**. For this repo it is `https://guhvnah.github.io/Personal-budget-app/` (the path is case-sensitive).
 
 **Netlify instead:** "Add new site → Import from Git", choose the repo, build command `npm run build`, publish directory `dist`. The app uses relative paths, so it works at any URL.
 
