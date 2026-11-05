@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as db from './lib/db';
 import type { AllData } from './lib/db';
+import { buildHistory, suggestCategory, type History, type Suggestion } from './lib/suggest';
 import { DEFAULT_SETTINGS } from './lib/types';
 
 interface StoreValue extends AllData {
@@ -9,6 +10,10 @@ interface StoreValue extends AllData {
   reload(): Promise<void>;
   toast(message: string): void;
   toastMessage: string | null;
+  /** What you've categorised before, for learning. */
+  history: History;
+  /** The app's best category guess for a description/amount. */
+  suggest(description: string, amount: number): Suggestion | null;
 }
 
 const empty: AllData = {
@@ -50,8 +55,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setToast((m) => (m === message ? null : m)), 3000);
   }, []);
 
+  const history = useMemo(() => buildHistory(data.transactions), [data.transactions]);
+  const suggest = useCallback(
+    (description: string, amount: number) =>
+      suggestCategory(description, amount, {
+        rules: data.rules,
+        categories: data.categories,
+        ownSuffixes: data.settings.ownAccountSuffixes,
+        history,
+      }),
+    [data.rules, data.categories, data.settings.ownAccountSuffixes, history],
+  );
+
   return (
-    <Ctx.Provider value={{ ...data, ready, error, reload, toast, toastMessage }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ ...data, ready, error, reload, toast, toastMessage, history, suggest }}>
+      {children}
+    </Ctx.Provider>
   );
 }
 

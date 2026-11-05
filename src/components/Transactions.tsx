@@ -3,6 +3,7 @@ import { formatDate } from '../lib/dates';
 import { dollarsToCents, formatAUD } from '../lib/money';
 import type { Transaction } from '../lib/types';
 import { useStore } from '../store';
+import { ReviewQueue } from './ReviewQueue';
 import { TransactionEditor } from './TransactionEditor';
 import { Amount, Empty, Icon, Sheet } from './ui';
 
@@ -61,6 +62,8 @@ export function Transactions({
   const [editing, setEditing] = useState<Transaction | null | 'new'>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [limit, setLimit] = useState(PAGE);
+  const [queue, setQueue] = useState(false);
+  const toReview = useMemo(() => transactions.filter((t) => t.categoryId === null).length, [transactions]);
 
   const catName = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
   const results = useMemo(
@@ -77,8 +80,19 @@ export function Transactions({
     else grouped.push([t.date, [t]]);
   }
 
+  if (queue) return <ReviewQueue onBack={() => setQueue(false)} />;
+
   return (
     <div className="screen">
+      {toReview > 0 && (
+        <button className="review-banner" onClick={() => setQueue(true)}>
+          <span>
+            <b>{toReview}</b> transaction{toReview === 1 ? '' : 's'} to review
+            <small>Approve suggested categories or choose your own</small>
+          </span>
+          <Icon name="right" />
+        </button>
+      )}
       <div className="toolbar sticky">
         <label className="search">
           <Icon name="search" size={20} />
@@ -127,6 +141,7 @@ export function Transactions({
                     <span className="tx-desc">{t.description}</span>
                     <span className={`tx-cat ${t.categoryId ? '' : 'none'}`}>
                       {t.categoryId ? catName.get(t.categoryId) : 'Uncategorised'}
+                      {t.categoryId && t.categorySource === 'auto' && <span className="tag">auto</span>}
                       {accounts.length > 1 && ` · ${accounts.find((a) => a.id === t.accountId)?.name ?? ''}`}
                     </span>
                   </span>

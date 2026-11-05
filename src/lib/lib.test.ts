@@ -4,6 +4,7 @@ import { categorise, mentionedSuffixes, suggestPattern, transferSuffix } from '.
 import { addMonths, formatDate, parseDate, parseDayMonthName } from './dates';
 import { dedupeKeys } from './dedupe';
 import { buildRows, rowsToSave } from './importer';
+import { buildHistory } from './suggest';
 import { formatAUD, parseMoney } from './money';
 import { budgetRows, summariseMonth } from './stats';
 import type { Category, Rule, Transaction } from './types';
@@ -105,7 +106,12 @@ describe('dedupe', () => {
 });
 
 describe('importing overlapping statements', () => {
-  const data = { rules: [rule('BUDGET DIRECT', 'ins')], categories: cats, settings: { ownAccountSuffixes: ['1111'], notOwnAccountSuffixes: [] } };
+  const data = {
+    rules: [rule('BUDGET DIRECT', 'ins')],
+    categories: cats,
+    settings: { ownAccountSuffixes: ['1111'], notOwnAccountSuffixes: [] },
+    history: buildHistory([]),
+  };
 
   it('skips transactions already saved and repeats within one import', () => {
     const first = commbankTransactionSummary.parse([PAGE_1]).transactions; // Jan–Mar
@@ -128,9 +134,12 @@ describe('importing overlapping statements', () => {
 
   it('auto-categorises during import', () => {
     const rows = buildRows(commbankTransactionSummary.parse(STATEMENT).transactions, 'acc', 'pdf', data, new Set(), new Set());
-    expect(rows[0].categoryId).toBe('ins');
-    expect(rows[1].categoryId).toBe('xfer');
-    expect(rows[3].categoryId).toBeNull();
+    expect(rows[0]).toMatchObject({ categoryId: 'ins', categorySource: 'rule' });
+    expect(rows[1]).toMatchObject({ categoryId: 'xfer', categorySource: 'transfer' });
+    expect(rows[3]).toMatchObject({ categoryId: null, suggestion: null });
+    const saved = rowsToSave([{ fileName: 'a', accountId: 'acc', warnings: [], rows }]);
+    expect(saved[0].categorySource).toBe('rule');
+    expect(saved[3].categorySource).toBeUndefined();
   });
 
   it('does not save removed lines', () => {

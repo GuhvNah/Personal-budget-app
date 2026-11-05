@@ -230,3 +230,25 @@ input:focus, select:focus { outline: 2px solid var(--brand); outline-offset: 1px
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: 999px; padding-left: 12px; font-weight: 600; }
 .chip button { border: none; background: none; min-width: 40px; min-height: 40px; display: grid; place-items: center; color: var(--text-2); }
+
+/* Category suggestions */
+.picker { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.picker-row { display: flex; }
+.suggestion { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); border: 1px dashed var(--brand); }
+.suggestion-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.suggestion-text small { color: var(--text-2); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggestion .btn { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.auto-tag { font-size: 0.78rem; color: var(--text-2); }
+.tag { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--brand); border: 1px solid var(--brand); border-radius: 6px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
+.auto-tag .tag { margin-left: 0; }
+.review-actions { align-items: flex-start; }
+.review-main.static { padding: 6px 0 8px; }
+.approve-all { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 4px 0 10px; }
+.review-banner { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; margin-bottom: 6px; border-radius: var(--radius); border: 1px solid var(--brand); background: var(--surface); color: var(--text); min-height: 56px; }
+.review-banner > span { flex: 1; display: flex; flex-direction: column; }
+.review-banner small { color: var(--text-2); font-size: 0.8rem; }
+.review-banner svg { color: var(--brand); }
+.queue-head { display: flex; align-items: center; gap: 4px; margin: 4px 0 4px -8px; }
+.queue-head h2 { font-size: 1.4rem; }
+.nav-icon { position: relative; display: inline-flex; }
+.nav-badge { position: absolute; top: -6px; left: 14px; min-width: 20px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--brand); color: var(--brand-ink); font-size: 0.68rem; font-weight: 700; display: grid; place-items: center; }
