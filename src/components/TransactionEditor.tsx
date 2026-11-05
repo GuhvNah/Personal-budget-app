@@ -23,6 +23,8 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
   const [amount, setAmount] = useState(tx ? centsToInput(tx.amount) : '');
   const [direction, setDirection] = useState<'out' | 'in'>(tx && tx.amount > 0 ? 'in' : 'out');
   const [categoryId, setCategoryId] = useState<string | null>(tx?.categoryId ?? null);
+  // How the current category was chosen in this editor: approved suggestion or picked from the list.
+  const [pickedVia, setPickedVia] = useState<'user' | 'approved'>('user');
   const [accountId, setAccountId] = useState(tx?.accountId ?? accounts[0]?.id ?? MANUAL_ACCOUNT_ID);
   const [notes, setNotes] = useState(tx?.notes ?? '');
   const [necessity, setNecessity] = useState<Necessity | undefined>(tx?.necessity);
@@ -57,8 +59,8 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
             ? 'user'
             : tx?.categorySource
           : categoryId === tx?.categoryId
-            ? (tx.categorySource ?? 'user')
-            : 'user',
+            ? tx.categorySource
+            : pickedVia,
       accountId,
       notes: notes.trim() || undefined,
       necessity,
@@ -90,9 +92,9 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
       <ApplySheet
         description={saved.description}
         category={category}
-        plan={(by) => {
-          const r = planRetro(transactions, by, category.id, (t) => t.id === saved.id);
-          return { change: r.change.length, skipped: r.skipped };
+        plan={(by, includeManual) => {
+          const r = planRetro(transactions, by, category.id, (t) => t.id === saved.id, includeManual);
+          return { change: r.change.length, manual: r.manual };
         }}
         onConfirm={async (choice) => {
           const changed = await commitChoice(choice, category.id, saved.id);
@@ -156,10 +158,16 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
         <CategoryPicker
           categories={categories}
           value={categoryId}
-          source={categoryId === tx?.categoryId ? tx?.categorySource : 'user'}
+          source={categoryId === tx?.categoryId ? tx?.categorySource : pickedVia}
           suggestion={suggestion}
-          onApprove={setCategoryId}
-          onChange={setCategoryId}
+          onApprove={(id) => {
+            setCategoryId(id);
+            setPickedVia('approved');
+          }}
+          onChange={(id) => {
+            setCategoryId(id);
+            setPickedVia('user');
+          }}
         />
       </div>
       {direction === 'out' && (!currentCat || currentCat.kind === 'expense') && (

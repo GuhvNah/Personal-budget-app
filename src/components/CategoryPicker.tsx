@@ -26,7 +26,10 @@ export function CategoryPicker({
   placeholder?: string;
 }) {
   const suggested = !value && suggestion ? categories.find((c) => c.id === suggestion.categoryId) : undefined;
-  const auto = value && source && source !== 'user' && suggestion?.categoryId === value ? suggestion : null;
+  const auto =
+    value && (source === 'auto' || source === 'rule' || source === 'transfer') && suggestion?.categoryId === value
+      ? suggestion
+      : null;
   return (
     <div className="picker">
       {suggested && (

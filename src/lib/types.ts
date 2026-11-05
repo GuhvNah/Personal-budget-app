@@ -32,12 +32,15 @@ export type BuiltinCategory =
 
 /**
  * How a transaction got its category:
- * - user: chosen or approved by you (used for learning)
+ * - user: picked by you from the category list (protected from bulk updates
+ *   unless you ask; also used for learning). With no category, it means you
+ *   deliberately left it uncategorised.
+ * - approved: you approved the app's suggestion (used for learning)
  * - rule: one of your rules matched
  * - transfer: transfer between your own accounts
  * - auto: the app was confident and applied it (shown with an "auto" tag)
  */
-export type CategorySource = 'user' | 'rule' | 'transfer' | 'auto';
+export type CategorySource = 'user' | 'approved' | 'rule' | 'transfer' | 'auto';
 
 export interface Category {
   id: string;
@@ -70,7 +73,7 @@ export interface Transaction {
   /** Running balance after this transaction, when the source provides it. */
   balance?: Cents;
   categoryId: string | null;
-  /** Missing on transactions saved before this field existed – treated as 'user'. */
+  /** Missing on transactions saved before this field existed (not protected from bulk updates). */
   categorySource?: CategorySource;
   /** Override the category's necessary/unnecessary setting for this transaction. */
   necessity?: Necessity;

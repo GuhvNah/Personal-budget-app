@@ -93,7 +93,7 @@ export function rowsToSave(batches: ReviewBatch[]): Transaction[] {
         amount: r.amount,
         balance: r.balance,
         categoryId: r.categoryId,
-        categorySource: r.categoryId ? (r.categorySource ?? 'user') : undefined,
+        categorySource: r.categoryId ? (r.categorySource ?? 'approved') : undefined,
         dedupeKey: r.dedupeKey,
         source: r.source,
         createdAt: now + i,
