@@ -13,7 +13,7 @@ export interface Suggestion {
   /** Short explanation shown in the UI, e.g. "Rule: ALDI" or "Like 3 past transactions". */
   reason: string;
   /** What the category's source becomes if this is applied automatically. */
-  source: Exclude<CategorySource, 'user'>;
+  source: Exclude<CategorySource, 'user' | 'approved'>;
 }
 
 /** Built-in category key -> the name it had originally (fallback for older data). */

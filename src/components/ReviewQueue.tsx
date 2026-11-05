@@ -25,7 +25,9 @@ export function ReviewQueue({ onBack }: { onBack(): void }) {
   const withSuggestion = items.filter((i) => i.suggestion);
 
   async function setCategory(tx: Transaction, categoryId: string | null, viaApprove: boolean) {
-    await db.putTransactions([{ ...tx, categoryId, categorySource: categoryId ? 'user' : undefined }]);
+    await db.putTransactions([
+      { ...tx, categoryId, categorySource: categoryId ? (viaApprove ? 'approved' : 'user') : undefined },
+    ]);
     const similar = await store.reload();
     if (similar) store.toast(`Also categorised ${similar} similar transaction${similar === 1 ? '' : 's'}`);
     const cat = categories.find((c) => c.id === categoryId);
@@ -35,7 +37,7 @@ export function ReviewQueue({ onBack }: { onBack(): void }) {
   async function approveAll() {
     if (!confirm(`Approve all ${withSuggestion.length} suggested categories?`)) return;
     await db.putTransactions(
-      withSuggestion.map(({ tx, suggestion }) => ({ ...tx, categoryId: suggestion!.categoryId, categorySource: 'user' })),
+      withSuggestion.map(({ tx, suggestion }) => ({ ...tx, categoryId: suggestion!.categoryId, categorySource: 'approved' })),
     );
     await store.reload();
     store.toast(`Approved ${withSuggestion.length}`);
@@ -99,9 +101,9 @@ export function ReviewQueue({ onBack }: { onBack(): void }) {
         <ApplySheet
           description={applyPrompt.tx.description}
           category={applyPrompt.category}
-          plan={(by) => {
-            const r = planRetro(transactions, by, applyPrompt.category.id, (t) => t.id === applyPrompt.tx.id);
-            return { change: r.change.length, skipped: r.skipped };
+          plan={(by, includeManual) => {
+            const r = planRetro(transactions, by, applyPrompt.category.id, (t) => t.id === applyPrompt.tx.id, includeManual);
+            return { change: r.change.length, manual: r.manual };
           }}
           onConfirm={async (choice) => {
             const changed = await commitChoice(choice, applyPrompt.category.id, applyPrompt.tx.id);

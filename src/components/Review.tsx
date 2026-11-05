@@ -38,13 +38,15 @@ export function Review({
   const check = fresh.filter((r) => r.warnings.length > 0);
   const dupes = all.filter((r) => r.duplicate);
   const pending = toSave.filter((r) => !r.categoryId && r.suggestion);
-  const autoCount = toSave.filter((r) => r.categoryId && r.categorySource && r.categorySource !== 'user').length;
+  const autoCount = toSave.filter(
+    (r) => r.categoryId && (r.categorySource === 'auto' || r.categorySource === 'rule' || r.categorySource === 'transfer'),
+  ).length;
   const unsorted = toSave.filter((r) => !r.categoryId && !r.suggestion).length;
   const shown = tab === 'new' ? fresh : tab === 'suggested' ? pending : tab === 'check' ? check : dupes;
 
   function approveAll() {
     const ids = new Set(pending.map((r) => r.rowId));
-    updateRows((r) => (ids.has(r.rowId) ? { ...r, categoryId: r.suggestion!.categoryId, categorySource: 'user' } : r));
+    updateRows((r) => (ids.has(r.rowId) ? { ...r, categoryId: r.suggestion!.categoryId, categorySource: 'approved' } : r));
   }
   const transfersId = categories.find((c) => c.kind === 'transfer')?.id ?? null;
 
@@ -85,12 +87,10 @@ export function Review({
   }
 
   /** Set a row's category yourself, and give it to pending rows from the same merchant. */
-  function decide(row: ReviewRow, categoryId: string | null) {
+  function decide(row: ReviewRow, categoryId: string | null, source: 'user' | 'approved' = 'user') {
     const updated = batches.map((b) => ({
       ...b,
-      rows: b.rows.map((r) =>
-        r.rowId === row.rowId ? { ...r, categoryId, categorySource: categoryId ? ('user' as const) : undefined } : r,
-      ),
+      rows: b.rows.map((r) => (r.rowId === row.rowId ? { ...r, categoryId, categorySource: categoryId ? source : undefined } : r)),
     }));
     if (!categoryId) return setBatches(updated);
     const { batches: next, count } = applyToSimilar(updated, row, categoryId);
@@ -248,7 +248,7 @@ export function Review({
                   value={r.categoryId}
                   source={r.categorySource}
                   suggestion={r.suggestion}
-                  onApprove={(id) => decide(r, id)}
+                  onApprove={(id) => decide(r, id, 'approved')}
                   onChange={(id) => changeCategory(r, id)}
                 />
                 <button
@@ -287,17 +287,21 @@ export function Review({
         <ApplySheet
           description={applyPrompt.row.description}
           category={applyPrompt.category}
-          plan={(by) => {
+          plan={(by, includeManual) => {
             const id = applyPrompt.category.id;
-            const inImport = planRetro(liveRows(applyPrompt.row.rowId), by, id);
-            const saved = planRetro(store.transactions, by, id);
-            return { change: inImport.change.length + saved.change.length, skipped: inImport.skipped + saved.skipped };
+            const inImport = planRetro(liveRows(applyPrompt.row.rowId), by, id, undefined, includeManual);
+            const saved = planRetro(store.transactions, by, id, undefined, includeManual);
+            return { change: inImport.change.length + saved.change.length, manual: inImport.manual + saved.manual };
           }}
           onConfirm={async (choice) => {
             const id = applyPrompt.category.id;
             let changed = 0;
             if (choice.applyExisting) {
-              const ids = new Set(planRetro(liveRows(applyPrompt.row.rowId), choice.by, id).change.map((r) => r.rowId));
+              const ids = new Set(
+                planRetro(liveRows(applyPrompt.row.rowId), choice.by, id, undefined, choice.includeManual).change.map(
+                  (r) => r.rowId,
+                ),
+              );
               changed += ids.size;
               const source = retroSource(choice.by);
               updateRows((r) => (ids.has(r.rowId) ? { ...r, categoryId: id, categorySource: source } : r));

@@ -213,17 +213,18 @@ function Rules() {
   const [pattern, setPattern] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [applyExisting, setApplyExisting] = useState(true);
+  const [includeManual, setIncludeManual] = useState(false);
   const catName = new Map(store.categories.map((c) => [c.id, c.name]));
   const retro =
     pattern.trim().length >= 2 && categoryId
-      ? planRetro(store.transactions, { pattern: pattern.trim() }, categoryId)
-      : { change: [], skipped: 0 };
+      ? planRetro(store.transactions, { pattern: pattern.trim() }, categoryId, undefined, includeManual)
+      : { change: [], manual: 0, skipped: 0 };
   const rules = [...store.rules].sort((a, b) => a.pattern.localeCompare(b.pattern));
 
   async function add() {
     if (!pattern.trim() || !categoryId) return;
     const changed = await commitChoice(
-      { rule: pattern.trim(), applyExisting, by: { pattern: pattern.trim() } },
+      { rule: pattern.trim(), applyExisting, by: { pattern: pattern.trim() }, includeManual },
       categoryId,
     );
     setPattern('');
@@ -293,8 +294,22 @@ function Rules() {
                 {retro.change.length === 0
                   ? 'No existing transactions to change'
                   : `${retro.change.length} will change to ${catName.get(categoryId)}`}
-                {retro.skipped > 0 && ` · ${retro.skipped} you chose yourself are left as they are`}
+                {retro.skipped > 0 && ` · ${retro.skipped} you picked yourself are left as they are`}
               </small>
+            </span>
+          </label>
+        )}
+        {pattern.trim().length >= 2 && categoryId && applyExisting && retro.manual > 0 && (
+          <label className="switch-row sub">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={includeManual}
+              onChange={(e) => setIncludeManual(e.target.checked)}
+            />
+            <span>
+              <b>Also change ones I picked myself ({retro.manual})</b>
+              <small>Off keeps categories you chose from the list.</small>
             </span>
           </label>
         )}

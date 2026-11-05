@@ -27,7 +27,7 @@ A private, offline personal budgeting app. It's a Progressive Web App you instal
   Obvious matches are applied automatically and tagged **rule**, **transfer** or **auto**. When it's less sure, it shows **"Suggested: X"**: tap **Approve**, or choose a different category. **Approve all** handles a whole import at once.
 - **To review list:** uncategorised transactions, including ones imported earlier, appear under **Transactions → To review** with suggestions. A badge on the Transactions tab shows how many are waiting.
 - **Apply to past transactions:** when you choose a category for a transaction, a sheet offers two switches:
-  - **Update existing transactions** (on by default) moves other transactions from the same merchant to that category. When you also create a rule, it moves every transaction matching the rule's text instead. It never changes transactions you categorised yourself, and it tells you how many will change and how many it's leaving alone.
+  - **Update existing transactions** (on by default) moves other transactions from the same merchant to that category. When you also create a rule, it moves every transaction matching the rule's text instead. It updates transactions categorised automatically, by a rule, by approving a suggestion, or in older imports. Transactions where you **picked the category from the list yourself** are left alone, unless you turn on **Also change ones I picked myself (N)**. It tells you how many will change and how many it's leaving alone.
   - **Also create a rule** (off by default), with editable text. It suggests the merchant name without the store number, e.g. "WOOLWORTHS".
 
   Adding a rule in **Settings → Rules** has the same "Apply to existing transactions" switch, with a live count.

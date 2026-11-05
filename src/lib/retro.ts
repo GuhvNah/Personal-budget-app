@@ -23,32 +23,37 @@ interface Categorised {
 }
 
 /**
- * Categorised (or deliberately left uncategorised) by you. Transactions saved
- * before categorySource existed count as yours too.
+ * Picked from the category list by you (or deliberately left uncategorised).
+ * Approved suggestions, automatic ones, rules and transactions saved before
+ * categorySource existed are not.
  */
 export function isManual(t: Categorised): boolean {
-  return t.categorySource === 'user' || (t.categorySource === undefined && t.categoryId !== null);
+  return t.categorySource === 'user';
 }
 
 /**
  * Plan a retroactive change: which matching transactions would move to
- * `categoryId`. Ones already in that category are ignored; ones you
- * categorised yourself are counted as skipped and left alone.
+ * `categoryId`. Ones already in that category are ignored. Ones you picked
+ * yourself are returned separately in `manual` and only changed when
+ * `includeManual` is set; `skipped` counts those left alone.
  */
 export function planRetro<T extends Categorised>(
   items: T[],
   by: MatchBy,
   categoryId: string,
   exclude: (t: T) => boolean = () => false,
-): { change: T[]; skipped: number } {
+  includeManual = false,
+): { change: T[]; manual: number; skipped: number } {
   const change: T[] = [];
-  let skipped = 0;
+  let manual = 0;
   for (const t of items) {
     if (exclude(t) || t.categoryId === categoryId || !matches(t.description, by)) continue;
-    if (isManual(t)) skipped++;
-    else change.push(t);
+    if (isManual(t)) {
+      manual++;
+      if (includeManual) change.push(t);
+    } else change.push(t);
   }
-  return { change, skipped };
+  return { change, manual, skipped: includeManual ? 0 : manual };
 }
 
 /** The category source to record for a retroactive change. */

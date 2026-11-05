@@ -15,6 +15,8 @@ export interface ApplyChoice {
   rule: string | null;
   /** What "matching" means for the update: the rule's text if creating one, else the merchant. */
   by: MatchBy;
+  /** Also change transactions you picked a category for yourself. */
+  includeManual: boolean;
 }
 
 /**
@@ -31,20 +33,22 @@ export function ApplySheet({
 }: {
   description: string;
   category: Category;
-  /** How many existing transactions would change, and how many of yours would be left alone. */
-  plan(by: MatchBy): { change: number; skipped: number };
+  /** How many existing transactions would change, and how many you picked yourself match too. */
+  plan(by: MatchBy, includeManual: boolean): { change: number; manual: number };
   onConfirm(choice: ApplyChoice): void | Promise<void>;
   onClose(): void;
 }) {
   const merchantOk = hasMerchant(description);
   const [applyExisting, setApplyExisting] = useState(true);
+  const [includeManual, setIncludeManual] = useState(false);
   // With no recognisable merchant, matching others needs a rule.
   const [makeRule, setMakeRule] = useState(!merchantOk);
   const [pattern, setPattern] = useState(() => suggestPattern(description));
   const p = pattern.trim();
   const ruleValid = p.length >= 2 && description.toLowerCase().includes(p.toLowerCase());
   const by: MatchBy | null = makeRule ? (ruleValid ? { pattern: p } : null) : merchantOk ? { merchantOf: description } : null;
-  const counts = by ? plan(by) : { change: 0, skipped: 0 };
+  const counts = by ? plan(by, includeManual) : { change: 0, manual: 0 };
+  const skipped = includeManual ? 0 : counts.manual;
   const merchant = merchantKeys(description)?.key;
   const what = makeRule ? `matching “${p}”` : `from ${merchant}`;
   const [busy, setBusy] = useState(false);
@@ -67,6 +71,7 @@ export function ApplySheet({
                 applyExisting: applyExisting && !!by && counts.change > 0,
                 rule: makeRule && ruleValid ? p : null,
                 by: by ?? { pattern: p },
+                includeManual,
               });
               onClose();
             }}
@@ -94,11 +99,26 @@ export function ApplySheet({
                 ? 'Enter text from the description to match.'
                 : "Can't tell the merchant from this description – create a rule to match others."
               : counts.change === 0
-                ? `No other transactions to change${counts.skipped ? ` (${counts.skipped} you chose yourself are left as they are)` : ''}.`
-                : `${counts.change} will change to ${category.name}${counts.skipped ? ` · ${counts.skipped} you chose yourself are left as they are` : ''}.`}
+                ? `No other transactions to change${skipped ? ` (${skipped} you picked yourself are left as they are)` : ''}.`
+                : `${counts.change} will change to ${category.name}${skipped ? ` · ${skipped} you picked yourself are left as they are` : ''}.`}
           </small>
         </span>
       </label>
+
+      {applyExisting && by && counts.manual > 0 && (
+        <label className="switch-row sub">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={includeManual}
+            onChange={(e) => setIncludeManual(e.target.checked)}
+          />
+          <span>
+            <b>Also change ones I picked myself ({counts.manual})</b>
+            <small>Transactions where you chose the category from the list. Off keeps your earlier choices.</small>
+          </span>
+        </label>
+      )}
 
       <label className="switch-row">
         <input type="checkbox" role="switch" checked={makeRule} onChange={(e) => setMakeRule(e.target.checked)} />
@@ -133,7 +153,7 @@ export async function commitChoice(
   }
   if (!choice.applyExisting) return 0;
   const { transactions } = await db.loadAll();
-  const { change } = planRetro(transactions, choice.by, categoryId, (t) => t.id === excludeId);
+  const { change } = planRetro(transactions, choice.by, categoryId, (t) => t.id === excludeId, choice.includeManual);
   await db.putTransactions(change.map((t) => ({ ...t, categoryId, categorySource: retroSource(choice.by) })));
   return change.length;
 }
