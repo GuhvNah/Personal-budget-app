@@ -1,6 +1,7 @@
 import { dedupeKeys } from './dedupe';
 import type { AllData } from './db';
 import { newId } from './id';
+import { matchCaptured } from './capture';
 import { sameMerchant, suggestCategory, type History, type Suggestion } from './suggest';
 import type { Account, CategorySource, Transaction } from './types';
 import type { ParsedAccount, ParsedTransaction } from '../parsers/types';
@@ -18,6 +19,10 @@ export interface ReviewRow extends ParsedTransaction {
   duplicate: boolean;
   /** User removed the line on the review screen. */
   removed: boolean;
+  /** A pending captured purchase this statement line replaces when saved. */
+  replacesCapture?: Transaction;
+  necessity?: Transaction['necessity'];
+  notes?: string;
   source: 'pdf' | 'csv';
 }
 
@@ -94,6 +99,8 @@ export function rowsToSave(batches: ReviewBatch[]): Transaction[] {
         balance: r.balance,
         categoryId: r.categoryId,
         categorySource: r.categoryId ? (r.categorySource ?? 'approved') : undefined,
+        necessity: r.necessity,
+        notes: r.notes,
         dedupeKey: r.dedupeKey,
         source: r.source,
         createdAt: now + i,
@@ -128,4 +135,38 @@ export function applyToSimilar(
     }),
   }));
   return { batches: next, count };
+}
+
+/**
+ * Link statement lines to pending purchases captured from notifications
+ * (same amount, date within a few days). The statement line keeps the
+ * capture's category if you chose or approved it there (or if the line has
+ * none), plus its necessary/unnecessary override and notes. On save the
+ * pending capture is replaced by the statement line.
+ */
+export function attachCaptures(batches: ReviewBatch[], pending: Transaction[]): ReviewBatch[] {
+  const rows = batches.flatMap((b) => b.rows).filter((r) => !r.duplicate);
+  const matches = matchCaptured(rows, pending.filter((t) => t.source === 'capture' && t.pending));
+  const byRow = new Map([...matches].map(([i, c]) => [rows[i].rowId, c]));
+  return batches.map((b) => ({
+    ...b,
+    rows: b.rows.map((r) => {
+      const c = byRow.get(r.rowId);
+      if (!c) return r;
+      const keepCaptured =
+        c.categoryId !== null && (r.categoryId === null || c.categorySource === 'user' || c.categorySource === 'approved');
+      return {
+        ...r,
+        replacesCapture: c,
+        ...(keepCaptured ? { categoryId: c.categoryId, categorySource: c.categorySource } : {}),
+        necessity: c.necessity,
+        notes: c.notes,
+      };
+    }),
+  }));
+}
+
+/** IDs of pending captures that a save will replace. */
+export function replacedCaptureIds(batches: ReviewBatch[]): string[] {
+  return batches.flatMap((b) => b.rows.filter((r) => r.replacesCapture && !r.duplicate && !r.removed).map((r) => r.replacesCapture!.id));
 }

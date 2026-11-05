@@ -6,6 +6,7 @@ import { NO_FILTERS, Transactions, type TxFilters } from './components/Transacti
 import { Icon } from './components/ui';
 import { todayISO } from './lib/dates';
 import { useStore } from './store';
+import { useCapture } from './lib/useCapture';
 
 type Tab = 'home' | 'transactions' | 'import' | 'settings';
 
@@ -22,6 +23,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [filters, setFilters] = useState<TxFilters>(NO_FILTERS);
+  useCapture();
 
   function go(t: Tab) {
     setTab(t);

@@ -78,7 +78,13 @@ export interface Transaction {
   /** Override the category's necessary/unnecessary setting for this transaction. */
   necessity?: Necessity;
   dedupeKey: string;
-  source: 'pdf' | 'csv' | 'manual';
+  /** 'capture' = recorded in real time from a payment notification. */
+  source: 'pdf' | 'csv' | 'manual' | 'capture';
+  /**
+   * A captured purchase not yet matched to a bank statement. Replaced by the
+   * statement's version when you import one that contains it.
+   */
+  pending?: boolean;
   notes?: string;
   createdAt: number;
 }
@@ -102,6 +108,10 @@ export interface Settings {
   ownAccountSuffixes: string[];
   /** Suffixes the user has already said are NOT theirs, so we stop asking. */
   notOwnAccountSuffixes: string[];
+  /** Secret in the capture link so only your automation can add purchases. */
+  captureKey?: string;
+  /** Account captured purchases are recorded against (e.g. your offset account). */
+  captureAccountId?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

@@ -200,8 +200,18 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
         <span>Notes</span>
         <input value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
-      {fromStatement && tx?.reference && <p className="hint">Reference: {tx.reference}</p>}
-      {fromStatement && (
+      {tx?.pending && (
+        <p className="hint">
+          Pending: captured from a payment notification. It'll be replaced by the bank's version when you import a
+          statement that includes it, keeping the category you set here.
+        </p>
+      )}
+      {fromStatement && tx?.reference && (
+        <p className="hint">
+          {tx.source === 'capture' ? 'Notification' : 'Reference'}: {tx.reference}
+        </p>
+      )}
+      {fromStatement && tx?.source !== 'capture' && (
         <p className="hint">Imported from a {tx?.source.toUpperCase()} statement.</p>
       )}
       {error && <p className="error">{error}</p>}
