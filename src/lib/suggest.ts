@@ -134,13 +134,16 @@ export function suggestCategory(description: string, amount: number, ctx: Sugges
   const keys = merchantKeys(description);
   const exact = keys ? top(ctx.history.byKey.get(keys.key)) : null;
   const plural = (n: number) => `${n} past transaction${n === 1 ? '' : 's'}`;
+  const approved = (n: number) => (n === 1 ? 'one you approved' : `${n} you approved`);
   let weak: Suggestion | null = null;
 
   if (exact && live.has(exact.categoryId)) {
     const s: Suggestion = {
       categoryId: exact.categoryId,
-      confident: exact.count >= 2 && exact.share >= 0.75,
-      reason: `Like ${plural(exact.count)}`,
+      // One approval is enough when every past choice for this merchant agrees;
+      // with mixed history, need a clear majority.
+      confident: exact.share === 1 || (exact.count >= 2 && exact.share >= 0.75),
+      reason: exact.share === 1 ? `Same as ${approved(exact.count)}` : `Like ${plural(exact.count)}`,
       source: 'auto',
     };
     if (s.confident) return s;
@@ -162,4 +165,28 @@ export function suggestCategory(description: string, amount: number, ctx: Sugges
     return { categoryId: loose.categoryId, confident: false, reason: `Similar to ${plural(loose.count)}`, source: 'auto' };
   }
   return null;
+}
+
+/** True when two descriptions are the same merchant (see merchantKeys). */
+export function sameMerchant(a: string, b: string): boolean {
+  const ka = merchantKeys(a);
+  return !!ka && ka.key === merchantKeys(b)?.key;
+}
+
+/**
+ * Pending (uncategorised) transactions that can now be categorised confidently –
+ * e.g. because you approved a transaction from the same merchant. Returns the
+ * updated copies to save. Transactions you deliberately left uncategorised
+ * (categorySource 'user') are not touched.
+ */
+export function autoApplyPending(
+  transactions: Transaction[],
+  ctx: Omit<SuggestContext, 'history'>,
+): Transaction[] {
+  const history = buildHistory(transactions);
+  return transactions.flatMap((t) => {
+    if (t.categoryId !== null || t.categorySource === 'user') return [];
+    const s = suggestCategory(t.description, t.amount, { ...ctx, history });
+    return s?.confident ? [{ ...t, categoryId: s.categoryId, categorySource: s.source }] : [];
+  });
 }

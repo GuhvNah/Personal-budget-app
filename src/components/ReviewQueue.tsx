@@ -27,7 +27,8 @@ export function ReviewQueue({ onBack }: { onBack(): void }) {
 
   async function setCategory(tx: Transaction, categoryId: string | null, viaApprove: boolean) {
     await db.putTransactions([{ ...tx, categoryId, categorySource: categoryId ? 'user' : undefined }]);
-    await store.reload();
+    const similar = await store.reload();
+    if (similar) store.toast(`Also categorised ${similar} similar transaction${similar === 1 ? '' : 's'}`);
     const cat = categories.find((c) => c.id === categoryId);
     if (!viaApprove && cat) setRulePrompt({ tx, category: cat });
   }

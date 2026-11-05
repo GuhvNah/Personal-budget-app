@@ -1,13 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as db from './lib/db';
 import type { AllData } from './lib/db';
-import { buildHistory, suggestCategory, type History, type Suggestion } from './lib/suggest';
+import { autoApplyPending, buildHistory, suggestCategory, type History, type Suggestion } from './lib/suggest';
 import { DEFAULT_SETTINGS } from './lib/types';
 
 interface StoreValue extends AllData {
   ready: boolean;
   error: string | null;
-  reload(): Promise<void>;
+  /**
+   * Reload everything from the database. Also auto-categorises any pending
+   * transactions that are now obvious (e.g. same merchant as one you just
+   * approved). Returns how many were auto-categorised.
+   */
+  reload(): Promise<number>;
   toast(message: string): void;
   toastMessage: string | null;
   /** What you've categorised before, for learning. */
@@ -35,12 +40,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     try {
-      setData(await db.loadAll());
+      const loaded = await db.loadAll();
+      const applied = autoApplyPending(loaded.transactions, {
+        rules: loaded.rules,
+        categories: loaded.categories,
+        ownSuffixes: loaded.settings.ownAccountSuffixes,
+      });
+      if (applied.length) {
+        await db.putTransactions(applied);
+        const byId = new Map(applied.map((t) => [t.id, t]));
+        loaded.transactions = loaded.transactions.map((t) => byId.get(t.id) ?? t);
+      }
+      setData(loaded);
       setReady(true);
+      return applied.length;
     } catch (e) {
       setError(
         `Couldn't open the on-device database: ${(e as Error).message}. Private/incognito mode may block storage.`,
       );
+      return 0;
     }
   }, []);
 

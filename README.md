@@ -22,6 +22,8 @@ A private, offline personal budgeting app. It's a Progressive Web App you instal
   3. how you've categorised that merchant before (it learns from the ones you choose or approve)
   4. a built-in list of common Australian merchants (Woolworths, Coles, BP, Ampol, Netflix, Synergy, Telstra, Bupa, Uber Eats and so on)
 
+  **Once you approve or choose a category for a merchant, the rest follow:** other pending transactions from the same merchant get the same category straight away, tagged **auto** ("Same as one you approved"). That happens on the import screen and in the To review list, and for future imports too. Store numbers are ignored, so "WOOLWORTHS 4021 PERTH" and "WOOLWORTHS 1234 PERTH" match. A different branch name, such as "WOOLWORTHS MIDLAND", is asked about once. If you've put the same merchant in different categories before, it goes back to suggesting. A transaction you deliberately set back to Uncategorised is left alone.
+
   Obvious matches are applied automatically and tagged **rule**, **transfer** or **auto**. When it's less sure, it shows **"Suggested: X"**: tap **Approve**, or choose a different category. **Approve all** handles a whole import at once.
 - **To review list:** uncategorised transactions, including ones imported earlier, appear under **Transactions → To review** with suggestions. A badge on the Transactions tab shows how many are waiting.
 - **Rules:** when you choose a different category, the app offers to make it a rule and apply it to matching uncategorised transactions.

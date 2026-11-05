@@ -48,14 +48,23 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
       description: description.trim(),
       amount: direction === 'out' ? -cents : cents,
       categoryId,
+      // Clearing a category on purpose is remembered, so it isn't auto-categorised again.
       categorySource:
-        categoryId === null ? undefined : categoryId === tx?.categoryId ? (tx.categorySource ?? 'user') : 'user',
+        categoryId === null
+          ? tx?.categoryId
+            ? 'user'
+            : tx?.categorySource
+          : categoryId === tx?.categoryId
+            ? (tx.categorySource ?? 'user')
+            : 'user',
       accountId,
       notes: notes.trim() || undefined,
     } as Transaction;
     await db.putTransactions([saved]);
-    await store.reload();
-    store.toast(tx ? 'Transaction updated' : 'Transaction added');
+    const similar = await store.reload();
+    store.toast(
+      `${tx ? 'Transaction updated' : 'Transaction added'}${similar ? ` · ${similar} similar categorised too` : ''}`,
+    );
 
     const changed = categoryId && categoryId !== (tx?.categoryId ?? null);
     const cat = categories.find((c) => c.id === categoryId);
