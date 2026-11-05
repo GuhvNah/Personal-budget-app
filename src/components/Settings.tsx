@@ -4,7 +4,8 @@ import * as db from '../lib/db';
 import { formatDate, todayISO } from '../lib/dates';
 import { newId } from '../lib/id';
 import { centsToInput, dollarsToCents } from '../lib/money';
-import type { Category, CategoryKind } from '../lib/types';
+import { categoryNecessity } from '../lib/outgoings';
+import type { Category, CategoryKind, Necessity } from '../lib/types';
 import { useStore } from '../store';
 import { CategorySelect, Icon, Sheet } from './ui';
 
@@ -33,6 +34,7 @@ function Categories() {
   const store = useStore();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<CategoryKind>('expense');
+  const [necessity, setNecessity] = useState<Necessity>('necessary');
   const [deleting, setDeleting] = useState<Category | null>(null);
 
   async function add() {
@@ -42,7 +44,7 @@ function Categories() {
       return store.toast(`There's already a category called ${n}`);
     }
     const order = Math.max(0, ...store.categories.map((c) => c.order)) + 1;
-    await db.putCategory({ id: newId(), name: n, kind, order });
+    await db.putCategory({ id: newId(), name: n, kind, order, ...(kind === 'expense' ? { necessity } : {}) });
     setName('');
     await store.reload();
     store.toast(`Added ${n}`);
@@ -59,7 +61,10 @@ function Categories() {
   return (
     <section className="card">
       <h3>Categories</h3>
-      <p className="hint">Tap a name to rename it.</p>
+      <p className="hint">
+        Tap a name to rename it. Tap <b>Necessary</b> / <b>Unnecessary</b> to change how that category's spending is
+        split on the dashboard.
+      </p>
       <ul className="settings-list">
         {store.categories.map((c) => (
           <li key={c.id + c.name} className="cat-row">
@@ -70,7 +75,22 @@ function Categories() {
               onBlur={(e) => void rename(c, e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
             />
-            <span className="kind">{KIND_LABEL[c.kind]}</span>
+            {c.kind === 'expense' ? (
+              <button
+                className={`necessity-btn ${categoryNecessity(c)}`}
+                aria-label={`${c.name} is ${categoryNecessity(c)}. Tap to change.`}
+                onClick={async () => {
+                  const next: Necessity = categoryNecessity(c) === 'necessary' ? 'unnecessary' : 'necessary';
+                  await db.putCategory({ ...c, necessity: next });
+                  await store.reload();
+                  store.toast(`${c.name}: ${next}`);
+                }}
+              >
+                {categoryNecessity(c) === 'necessary' ? 'Necessary' : 'Unnecessary'}
+              </button>
+            ) : (
+              <span className="kind">{KIND_LABEL[c.kind]}</span>
+            )}
             {c.system ? (
               <span className="icon-btn placeholder" />
             ) : (
@@ -81,13 +101,19 @@ function Categories() {
           </li>
         ))}
       </ul>
-      <div className="add-row">
+      <div className="add-row cat-add">
         <input placeholder="New category" value={name} onChange={(e) => setName(e.target.value)} />
         <select value={kind} onChange={(e) => setKind(e.target.value as CategoryKind)} aria-label="Type">
           <option value="expense">Spending</option>
           <option value="income">Income</option>
           <option value="transfer">Not counted</option>
         </select>
+        {kind === 'expense' && (
+          <select value={necessity} onChange={(e) => setNecessity(e.target.value as Necessity)} aria-label="Necessary?">
+            <option value="necessary">Necessary</option>
+            <option value="unnecessary">Unnecessary</option>
+          </select>
+        )}
         <button className="btn primary" onClick={add} disabled={!name.trim()}>
           Add
         </button>

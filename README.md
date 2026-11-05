@@ -28,6 +28,9 @@ A private, offline personal budgeting app. It's a Progressive Web App you instal
 - **To review list:** uncategorised transactions, including ones imported earlier, appear under **Transactions → To review** with suggestions. A badge on the Transactions tab shows how many are waiting.
 - **Rules:** when you choose a different category, the app offers to make it a rule and apply it to matching uncategorised transactions.
 - **Transfers between your own accounts:** "Transfer to/from xxNNNN" to an account you've marked as yours goes in **Transfers**. That category isn't counted as spending or income. The review screen asks about account numbers it hasn't seen before.
+- **Outgoings donut chart:** the inner ring splits spending into **Necessary** (blue) and **Unnecessary** (orange). The outer ring shows the categories within each. Spending that isn't categorised yet is grey, under "Not sorted yet". Choose **Month**, **Quarter**, **6 months** or **Year** (calendar periods) and step back and forward with the arrows. Tap a slice to see its amount in the middle, or a row to open its transactions.
+  - Each spending category is marked Necessary or Unnecessary. Tap the label in **Settings → Categories** to switch it. The defaults are: necessary for Rent/Mortgage, Bills, Insurance, Groceries, Fuel and Childcare; unnecessary for Eating Out, Entertainment and Other.
+  - To override a single transaction, open it and choose **Necessary** or **Unnecessary**.
 - **Monthly budgets per category**, plus a dashboard showing:
   - spending vs budget for the month
   - income, spending and net
