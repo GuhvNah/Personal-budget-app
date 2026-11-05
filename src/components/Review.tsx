@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { mentionedSuffixes, ruleMatches, transferSuffix } from '../lib/categorise';
+import { mentionedSuffixes, transferSuffix } from '../lib/categorise';
 import * as db from '../lib/db';
 import { formatDate } from '../lib/dates';
-import { newId } from '../lib/id';
 import { centsToInput, dollarsToCents, formatAUD } from '../lib/money';
 import { applyToSimilar, rowsToSave, type ReviewBatch, type ReviewRow } from '../lib/importer';
 import type { Category } from '../lib/types';
 import { useStore } from '../store';
-import { RulePrompt } from './RulePrompt';
+import { ApplySheet, choiceSummary, commitChoice } from './ApplySheet';
+import { planRetro, retroSource } from '../lib/retro';
 import { CategoryPicker } from './CategoryPicker';
 import { Amount, Icon, Sheet } from './ui';
 
@@ -29,7 +29,7 @@ export function Review({
   const [batches, setBatches] = useState(initial);
   const [tab, setTab] = useState<Tab>('new');
   const [editing, setEditing] = useState<ReviewRow | null>(null);
-  const [rulePrompt, setRulePrompt] = useState<{ row: ReviewRow; category: Category } | null>(null);
+  const [applyPrompt, setApplyPrompt] = useState<{ row: ReviewRow; category: Category } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const all = batches.flatMap((b) => b.rows);
@@ -56,6 +56,11 @@ export function Review({
   const unknownSuffixes = mentionedSuffixes(fresh.map((r) => r.description)).filter(
     (s) => !ownLast4.has(s) && !settings.notOwnAccountSuffixes.includes(s),
   );
+
+  /** Rows in this import that will be saved, apart from `exceptRowId`. */
+  function liveRows(exceptRowId: string) {
+    return batches.flatMap((b) => b.rows).filter((r) => r.rowId !== exceptRowId && !r.duplicate && !r.removed);
+  }
 
   function updateRows(fn: (r: ReviewRow) => ReviewRow) {
     setBatches((bs) => bs.map((b) => ({ ...b, rows: b.rows.map(fn) })));
@@ -96,7 +101,7 @@ export function Review({
   function changeCategory(row: ReviewRow, categoryId: string | null) {
     decide(row, categoryId);
     const cat = categories.find((c) => c.id === categoryId);
-    if (cat) setRulePrompt({ row, category: cat });
+    if (cat) setApplyPrompt({ row, category: cat });
   }
 
   async function save() {
@@ -278,28 +283,31 @@ export function Review({
           }}
         />
       )}
-      {rulePrompt && (
-        <RulePrompt
-          description={rulePrompt.row.description}
-          category={rulePrompt.category}
-          countMatches={(p) =>
-            all.filter(
-              (r) => r.rowId !== rulePrompt.row.rowId && r.categoryId === null && ruleMatches({ pattern: p } as never, r.description),
-            ).length
-          }
-          onCreate={async (pattern, apply) => {
-            await db.putRule({ id: newId(), pattern, categoryId: rulePrompt.category.id, createdAt: Date.now() });
-            await store.reload();
-            if (apply) {
-              updateRows((r) =>
-                r.categoryId === null && ruleMatches({ pattern } as never, r.description)
-                  ? { ...r, categoryId: rulePrompt.category.id, categorySource: 'rule' }
-                  : r,
-              );
-            }
-            store.toast('Rule created');
+      {applyPrompt && (
+        <ApplySheet
+          description={applyPrompt.row.description}
+          category={applyPrompt.category}
+          plan={(by) => {
+            const id = applyPrompt.category.id;
+            const inImport = planRetro(liveRows(applyPrompt.row.rowId), by, id);
+            const saved = planRetro(store.transactions, by, id);
+            return { change: inImport.change.length + saved.change.length, skipped: inImport.skipped + saved.skipped };
           }}
-          onClose={() => setRulePrompt(null)}
+          onConfirm={async (choice) => {
+            const id = applyPrompt.category.id;
+            let changed = 0;
+            if (choice.applyExisting) {
+              const ids = new Set(planRetro(liveRows(applyPrompt.row.rowId), choice.by, id).change.map((r) => r.rowId));
+              changed += ids.size;
+              const source = retroSource(choice.by);
+              updateRows((r) => (ids.has(r.rowId) ? { ...r, categoryId: id, categorySource: source } : r));
+            }
+            changed += await commitChoice(choice, id);
+            await store.reload();
+            const msg = choiceSummary(changed, choice.rule);
+            if (msg) store.toast(msg);
+          }}
+          onClose={() => setApplyPrompt(null)}
         />
       )}
     </div>

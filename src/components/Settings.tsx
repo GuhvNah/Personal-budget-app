@@ -7,6 +7,8 @@ import { centsToInput, dollarsToCents } from '../lib/money';
 import { categoryNecessity } from '../lib/outgoings';
 import type { Category, CategoryKind, Necessity } from '../lib/types';
 import { useStore } from '../store';
+import { choiceSummary, commitChoice } from './ApplySheet';
+import { planRetro } from '../lib/retro';
 import { CategorySelect, Icon, Sheet } from './ui';
 
 const LAST_BACKUP = 'lastBackup';
@@ -210,15 +212,23 @@ function Rules() {
   const store = useStore();
   const [pattern, setPattern] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [applyExisting, setApplyExisting] = useState(true);
   const catName = new Map(store.categories.map((c) => [c.id, c.name]));
+  const retro =
+    pattern.trim().length >= 2 && categoryId
+      ? planRetro(store.transactions, { pattern: pattern.trim() }, categoryId)
+      : { change: [], skipped: 0 };
   const rules = [...store.rules].sort((a, b) => a.pattern.localeCompare(b.pattern));
 
   async function add() {
     if (!pattern.trim() || !categoryId) return;
-    await db.putRule({ id: newId(), pattern: pattern.trim(), categoryId, createdAt: Date.now() });
+    const changed = await commitChoice(
+      { rule: pattern.trim(), applyExisting, by: { pattern: pattern.trim() } },
+      categoryId,
+    );
     setPattern('');
     await store.reload();
-    store.toast('Rule added');
+    store.toast(choiceSummary(changed, pattern.trim(), false));
   }
 
   async function reapply() {
@@ -269,6 +279,25 @@ function Rules() {
           onChange={setCategoryId}
           noneLabel="Choose category"
         />
+        {pattern.trim().length >= 2 && categoryId && (
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={applyExisting}
+              onChange={(e) => setApplyExisting(e.target.checked)}
+            />
+            <span>
+              <b>Apply to existing transactions</b>
+              <small>
+                {retro.change.length === 0
+                  ? 'No existing transactions to change'
+                  : `${retro.change.length} will change to ${catName.get(categoryId)}`}
+                {retro.skipped > 0 && ` · ${retro.skipped} you chose yourself are left as they are`}
+              </small>
+            </span>
+          </label>
+        )}
         <button className="btn primary" onClick={add} disabled={!pattern.trim() || !categoryId}>
           Add rule
         </button>

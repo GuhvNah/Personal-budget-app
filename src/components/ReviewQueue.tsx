@@ -1,19 +1,18 @@
 import { useMemo, useState } from 'react';
-import { ruleMatches } from '../lib/categorise';
 import * as db from '../lib/db';
 import { formatDate } from '../lib/dates';
-import { newId } from '../lib/id';
 import type { Category, Transaction } from '../lib/types';
 import { useStore } from '../store';
 import { CategoryPicker } from './CategoryPicker';
-import { RulePrompt } from './RulePrompt';
+import { ApplySheet, choiceSummary, commitChoice } from './ApplySheet';
+import { planRetro } from '../lib/retro';
 import { Amount, Empty, Icon } from './ui';
 
 /** Uncategorised transactions, with the app's suggestion to approve or change. */
 export function ReviewQueue({ onBack }: { onBack(): void }) {
   const store = useStore();
   const { transactions, categories, suggest } = store;
-  const [rulePrompt, setRulePrompt] = useState<{ tx: Transaction; category: Category } | null>(null);
+  const [applyPrompt, setApplyPrompt] = useState<{ tx: Transaction; category: Category } | null>(null);
   const [limit, setLimit] = useState(50);
 
   const items = useMemo(() => {
@@ -30,7 +29,7 @@ export function ReviewQueue({ onBack }: { onBack(): void }) {
     const similar = await store.reload();
     if (similar) store.toast(`Also categorised ${similar} similar transaction${similar === 1 ? '' : 's'}`);
     const cat = categories.find((c) => c.id === categoryId);
-    if (!viaApprove && cat) setRulePrompt({ tx, category: cat });
+    if (!viaApprove && cat) setApplyPrompt({ tx, category: cat });
   }
 
   async function approveAll() {
@@ -96,26 +95,21 @@ export function ReviewQueue({ onBack }: { onBack(): void }) {
           )}
         </>
       )}
-      {rulePrompt && (
-        <RulePrompt
-          description={rulePrompt.tx.description}
-          category={rulePrompt.category}
-          countMatches={(p) =>
-            transactions.filter((t) => t.categoryId === null && ruleMatches({ pattern: p } as never, t.description)).length
-          }
-          onCreate={async (pattern, apply) => {
-            await db.putRule({ id: newId(), pattern, categoryId: rulePrompt.category.id, createdAt: Date.now() });
-            if (apply) {
-              await db.putTransactions(
-                transactions
-                  .filter((t) => t.categoryId === null && ruleMatches({ pattern } as never, t.description))
-                  .map((t) => ({ ...t, categoryId: rulePrompt.category.id, categorySource: 'rule' as const })),
-              );
-            }
-            await store.reload();
-            store.toast('Rule created');
+      {applyPrompt && (
+        <ApplySheet
+          description={applyPrompt.tx.description}
+          category={applyPrompt.category}
+          plan={(by) => {
+            const r = planRetro(transactions, by, applyPrompt.category.id, (t) => t.id === applyPrompt.tx.id);
+            return { change: r.change.length, skipped: r.skipped };
           }}
-          onClose={() => setRulePrompt(null)}
+          onConfirm={async (choice) => {
+            const changed = await commitChoice(choice, applyPrompt.category.id, applyPrompt.tx.id);
+            await store.reload();
+            const msg = choiceSummary(changed, choice.rule);
+            if (msg) store.toast(msg);
+          }}
+          onClose={() => setApplyPrompt(null)}
         />
       )}
     </div>
