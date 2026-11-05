@@ -3,6 +3,7 @@ import { addMonths, formatMonth, todayISO } from '../lib/dates';
 import { formatAUD } from '../lib/money';
 import { budgetRows, recentMonths, summariseMonth } from '../lib/stats';
 import { useStore } from '../store';
+import { OutgoingsCard } from './OutgoingsCard';
 import { SpendingChart } from './SpendingChart';
 import { Empty, Icon } from './ui';
 import type { TxFilters } from './Transactions';
@@ -142,6 +143,8 @@ export function Dashboard({
           </ul>
         )}
       </section>
+
+      <OutgoingsCard month={month} openTransactions={(f) => openTransactions({ ...NO_FILTERS, ...f })} />
 
       <section className="card">
         <h3>Spending by month</h3>

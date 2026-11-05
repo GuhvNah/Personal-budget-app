@@ -1,7 +1,7 @@
 import { dedupeKeys } from './dedupe';
 import type { AllData } from './db';
 import { newId } from './id';
-import { suggestCategory, type History, type Suggestion } from './suggest';
+import { sameMerchant, suggestCategory, type History, type Suggestion } from './suggest';
 import type { Account, CategorySource, Transaction } from './types';
 import type { ParsedAccount, ParsedTransaction } from '../parsers/types';
 
@@ -99,4 +99,33 @@ export function rowsToSave(batches: ReviewBatch[]): Transaction[] {
         createdAt: now + i,
       })),
   );
+}
+
+/**
+ * After you approve or choose a category for one row, give the same category
+ * to the other pending rows from the same merchant (not ones already
+ * categorised, removed or duplicates). Returns the new batches and how many
+ * rows changed.
+ */
+export function applyToSimilar(
+  batches: ReviewBatch[],
+  source: ReviewRow,
+  categoryId: string,
+): { batches: ReviewBatch[]; count: number } {
+  let count = 0;
+  const next = batches.map((b) => ({
+    ...b,
+    rows: b.rows.map((r) => {
+      if (r.rowId === source.rowId || r.categoryId !== null || r.duplicate || r.removed) return r;
+      if (!sameMerchant(r.description, source.description)) return r;
+      count++;
+      return {
+        ...r,
+        categoryId,
+        categorySource: 'auto' as const,
+        suggestion: { categoryId, confident: true, reason: 'Same as one you approved', source: 'auto' as const },
+      };
+    }),
+  }));
+  return { batches: next, count };
 }

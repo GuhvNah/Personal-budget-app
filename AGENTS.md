@@ -8,3 +8,4 @@
 - The service worker (`src/sw.js`) is generated at build time by the plugin in `vite.config.ts` with the list of built files.
 - Before committing: `npm test` and `npm run build` must pass.
 - Categorising lives in `src/lib/suggest.ts` (rules → own-account transfers → learned history → built-in merchants in `merchants.ts`). Confident suggestions are applied with `categorySource` 'rule' | 'transfer' | 'auto'; others are shown for approval. Only 'user' (or legacy unset) categories feed the learning, so auto guesses can't reinforce themselves.
+- Outgoings (dashboard donut) live in `src/lib/outgoings.ts`: per-category `necessity` (defaults by builtin key via `categoryNecessity`) with an optional per-transaction override, and calendar periods (month/quarter/half/year).

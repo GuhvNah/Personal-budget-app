@@ -8,6 +8,8 @@ import type { Category, Transaction } from '../lib/types';
 import { useStore } from '../store';
 import { RulePrompt } from './RulePrompt';
 import { CategoryPicker } from './CategoryPicker';
+import { categoryNecessity } from '../lib/outgoings';
+import type { Necessity } from '../lib/types';
 import { Sheet } from './ui';
 
 export const MANUAL_ACCOUNT_ID = 'manual';
@@ -25,6 +27,7 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
   const [approved, setApproved] = useState(false);
   const [accountId, setAccountId] = useState(tx?.accountId ?? accounts[0]?.id ?? MANUAL_ACCOUNT_ID);
   const [notes, setNotes] = useState(tx?.notes ?? '');
+  const [necessity, setNecessity] = useState<Necessity | undefined>(tx?.necessity);
   const [rulePrompt, setRulePrompt] = useState<{ description: string; category: Category } | null>(null);
   const [error, setError] = useState('');
 
@@ -32,6 +35,7 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
   const signed = cents ? (direction === 'out' ? -cents : cents) : 0;
   const suggestion = description.trim() ? store.suggest(description, signed) : null;
   const fromStatement = tx !== null && tx.source !== 'manual';
+  const currentCat = categories.find((c) => c.id === categoryId);
 
   async function save() {
     if (!date) return setError('Enter a date.');
@@ -48,14 +52,24 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
       description: description.trim(),
       amount: direction === 'out' ? -cents : cents,
       categoryId,
+      // Clearing a category on purpose is remembered, so it isn't auto-categorised again.
       categorySource:
-        categoryId === null ? undefined : categoryId === tx?.categoryId ? (tx.categorySource ?? 'user') : 'user',
+        categoryId === null
+          ? tx?.categoryId
+            ? 'user'
+            : tx?.categorySource
+          : categoryId === tx?.categoryId
+            ? (tx.categorySource ?? 'user')
+            : 'user',
       accountId,
       notes: notes.trim() || undefined,
+      necessity,
     } as Transaction;
     await db.putTransactions([saved]);
-    await store.reload();
-    store.toast(tx ? 'Transaction updated' : 'Transaction added');
+    const similar = await store.reload();
+    store.toast(
+      `${tx ? 'Transaction updated' : 'Transaction added'}${similar ? ` · ${similar} similar categorised too` : ''}`,
+    );
 
     const changed = categoryId && categoryId !== (tx?.categoryId ?? null);
     const cat = categories.find((c) => c.id === categoryId);
@@ -156,6 +170,22 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
           }}
         />
       </div>
+      {direction === 'out' && (!currentCat || currentCat.kind === 'expense') && (
+        <div className="field">
+          <span>Necessary or unnecessary?</span>
+          <div className="segmented" role="radiogroup" aria-label="Necessary or unnecessary">
+            <button aria-pressed={necessity === undefined} onClick={() => setNecessity(undefined)}>
+              {currentCat ? `As category (${categoryNecessity(currentCat) === 'necessary' ? 'nec.' : 'unnec.'})` : 'Not set'}
+            </button>
+            <button aria-pressed={necessity === 'necessary'} onClick={() => setNecessity('necessary')}>
+              Necessary
+            </button>
+            <button aria-pressed={necessity === 'unnecessary'} onClick={() => setNecessity('unnecessary')}>
+              Unnecessary
+            </button>
+          </div>
+        </div>
+      )}
       <label className="field">
         <span>Account</span>
         <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>

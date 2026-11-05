@@ -14,6 +14,9 @@ export interface Account {
 
 export type CategoryKind = 'expense' | 'income' | 'transfer';
 
+/** Whether spending is a necessity or a nice-to-have. */
+export type Necessity = 'necessary' | 'unnecessary';
+
 export type BuiltinCategory =
   | 'groceries'
   | 'rent'
@@ -47,6 +50,11 @@ export interface Category {
    * built-in merchant list keeps working after a category is renamed.
    */
   builtin?: BuiltinCategory;
+  /**
+   * Spending categories only. Missing means the default for a built-in
+   * category (see categoryNecessity), or "necessary" for your own ones.
+   */
+  necessity?: Necessity;
   order: number;
 }
 
@@ -64,6 +72,8 @@ export interface Transaction {
   categoryId: string | null;
   /** Missing on transactions saved before this field existed – treated as 'user'. */
   categorySource?: CategorySource;
+  /** Override the category's necessary/unnecessary setting for this transaction. */
+  necessity?: Necessity;
   dedupeKey: string;
   source: 'pdf' | 'csv' | 'manual';
   notes?: string;

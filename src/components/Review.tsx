@@ -4,7 +4,7 @@ import * as db from '../lib/db';
 import { formatDate } from '../lib/dates';
 import { newId } from '../lib/id';
 import { centsToInput, dollarsToCents, formatAUD } from '../lib/money';
-import { rowsToSave, type ReviewBatch, type ReviewRow } from '../lib/importer';
+import { applyToSimilar, rowsToSave, type ReviewBatch, type ReviewRow } from '../lib/importer';
 import type { Category } from '../lib/types';
 import { useStore } from '../store';
 import { RulePrompt } from './RulePrompt';
@@ -79,8 +79,22 @@ export function Review({
     }
   }
 
+  /** Set a row's category yourself, and give it to pending rows from the same merchant. */
+  function decide(row: ReviewRow, categoryId: string | null) {
+    const updated = batches.map((b) => ({
+      ...b,
+      rows: b.rows.map((r) =>
+        r.rowId === row.rowId ? { ...r, categoryId, categorySource: categoryId ? ('user' as const) : undefined } : r,
+      ),
+    }));
+    if (!categoryId) return setBatches(updated);
+    const { batches: next, count } = applyToSimilar(updated, row, categoryId);
+    setBatches(next);
+    if (count) store.toast(`Also applied to ${count} similar transaction${count === 1 ? '' : 's'}`);
+  }
+
   function changeCategory(row: ReviewRow, categoryId: string | null) {
-    updateRow(row.rowId, { categoryId, categorySource: categoryId ? 'user' : undefined });
+    decide(row, categoryId);
     const cat = categories.find((c) => c.id === categoryId);
     if (cat) setRulePrompt({ row, category: cat });
   }
@@ -95,8 +109,10 @@ export function Review({
       await db.saveSettings({ ...settings, ownAccountSuffixes: [...own] });
       const txs = rowsToSave(batches);
       await db.putTransactions(txs);
-      await store.reload();
-      store.toast(`Saved ${txs.length} transaction${txs.length === 1 ? '' : 's'}`);
+      const similar = await store.reload();
+      store.toast(
+        `Saved ${txs.length} transaction${txs.length === 1 ? '' : 's'}${similar ? ` · ${similar} older similar ones categorised` : ''}`,
+      );
       onSaved();
     } catch (e) {
       alert(`Couldn't save: ${(e as Error).message}`);
@@ -227,7 +243,7 @@ export function Review({
                   value={r.categoryId}
                   source={r.categorySource}
                   suggestion={r.suggestion}
-                  onApprove={(id) => updateRow(r.rowId, { categoryId: id, categorySource: 'user' })}
+                  onApprove={(id) => decide(r, id)}
                   onChange={(id) => changeCategory(r, id)}
                 />
                 <button

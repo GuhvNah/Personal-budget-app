@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { tagBuiltins } from './db';
-import { buildRows } from './importer';
+import { applyToSimilar, buildRows, type ReviewBatch } from './importer';
 import { matchMerchant } from './merchants';
-import { buildHistory, merchantKeys, suggestCategory, type SuggestContext } from './suggest';
+import { autoApplyPending, buildHistory, merchantKeys, sameMerchant, suggestCategory, type SuggestContext } from './suggest';
 import type { Category, Rule, Transaction } from './types';
 
 const cats: Category[] = [
@@ -95,16 +95,22 @@ describe('suggestCategory', () => {
     expect(suggestCategory('WOOLWORTHS 5555 PERTH', -100, ctx({ history }))).toMatchObject({
       categoryId: 'gym',
       confident: true,
-      reason: 'Like 2 past transactions',
+      reason: 'Same as 2 you approved',
     });
   });
 
-  it('a single past example is only a suggestion', () => {
+  it('one approved transaction from the same merchant is enough', () => {
     const history = buildHistory([past('JIMS MOWING 12345', 'bills')]);
     expect(suggestCategory('JIMS MOWING 999', -8000, ctx({ history }))).toMatchObject({
       categoryId: 'bills',
-      confident: false,
+      confident: true,
+      reason: 'Same as one you approved',
     });
+  });
+
+  it('a different merchant with the same first word is only a suggestion', () => {
+    const history = buildHistory([past('JIMS MOWING 12345', 'bills'), past('JIMS MOWING 5', 'bills')]);
+    expect(suggestCategory('JIMS PLUMBING 7', -8000, ctx({ history }))).toMatchObject({ confident: false });
   });
 
   it('mixed history is only a suggestion', () => {
@@ -172,5 +178,63 @@ describe('import with suggestions', () => {
     expect(rows[0]).toMatchObject({ categoryId: 'groc', categorySource: 'auto' });
     expect(rows[1]).toMatchObject({ categoryId: null, suggestion: { categoryId: 'eat', confident: false } });
     expect(rows[2]).toMatchObject({ categoryId: null, suggestion: null });
+  });
+});
+
+const txn = (id: string, description: string, categoryId: string | null, categorySource?: Transaction['categorySource']): Transaction => ({
+  id,
+  accountId: 'a',
+  date: '2026-10-01',
+  description,
+  amount: -1000,
+  categoryId,
+  categorySource,
+  dedupeKey: id,
+  source: 'csv',
+  createdAt: 0,
+});
+
+describe('auto-approving like transactions', () => {
+  it('sameMerchant ignores store numbers but not different suburbs', () => {
+    expect(sameMerchant('WOOLWORTHS 4021 PERTH AU', 'WOOLWORTHS 1234 PERTH')).toBe(true);
+    expect(sameMerchant('WOOLWORTHS 4021 PERTH', 'WOOLWORTHS MIDLAND')).toBe(false);
+    expect(sameMerchant('Transfer to xx4444 CommBank app', 'Transfer to xx4444 NetBank')).toBe(true);
+    expect(sameMerchant('Transfer from CommBank app', 'Transfer from CommBank app')).toBe(false);
+  });
+
+  it('applies an approval to pending transactions from the same merchant', () => {
+    const all = [
+      txn('1', 'LOCAL SPORTS CLUB 1', 'fun', 'user'),
+      txn('2', 'LOCAL SPORTS CLUB 2', null),
+      txn('3', 'LOCAL SPORTS CLUB 3', null, 'user'), // you cleared it on purpose
+      txn('4', 'SOMETHING ELSE', null),
+      txn('5', 'LOCAL SPORTS CLUB 4', 'gym', 'user'), // already categorised: left alone
+    ];
+    // Mixed history (fun, gym) for this merchant -> not confident; drop #5 to make it unanimous.
+    expect(autoApplyPending(all, { rules: [], categories: cats, ownSuffixes: [] })).toEqual([]);
+    const applied = autoApplyPending(all.slice(0, 4), { rules: [], categories: cats, ownSuffixes: [] });
+    expect(applied.map((t) => [t.id, t.categoryId, t.categorySource])).toEqual([['2', 'fun', 'auto']]);
+  });
+
+  it('applies to similar rows on the import review screen', () => {
+    const rows = buildRows(
+      [
+        { date: '2026-10-01', description: 'LOCAL SPORTS CLUB 1', amount: -1200, warnings: [] },
+        { date: '2026-10-08', description: 'LOCAL SPORTS CLUB 2', amount: -1200, warnings: [] },
+        { date: '2026-10-09', description: 'LOCAL SPORTS CLUB 3', amount: -1200, warnings: [] },
+        { date: '2026-10-10', description: 'OTHER PLACE', amount: -500, warnings: [] },
+      ],
+      'acc',
+      'csv',
+      { rules: [], categories: cats, settings: { ownAccountSuffixes: [], notOwnAccountSuffixes: [] }, history: buildHistory([]) },
+      new Set(),
+      new Set(),
+    );
+    rows[2].removed = true;
+    const batches: ReviewBatch[] = [{ fileName: 'a', accountId: 'acc', warnings: [], rows }];
+    const { batches: next, count } = applyToSimilar(batches, rows[0], 'fun');
+    expect(count).toBe(1);
+    expect(next[0].rows.map((r) => r.categoryId)).toEqual([null, 'fun', null, null]);
+    expect(next[0].rows[1]).toMatchObject({ categorySource: 'auto', suggestion: { reason: 'Same as one you approved' } });
   });
 });

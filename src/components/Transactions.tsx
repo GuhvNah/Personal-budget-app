@@ -142,6 +142,7 @@ export function Transactions({
                     <span className={`tx-cat ${t.categoryId ? '' : 'none'}`}>
                       {t.categoryId ? catName.get(t.categoryId) : 'Uncategorised'}
                       {t.categoryId && t.categorySource === 'auto' && <span className="tag">auto</span>}
+                      {t.necessity && <span className={`tag ${t.necessity}`}>{t.necessity}</span>}
                       {accounts.length > 1 && ` · ${accounts.find((a) => a.id === t.accountId)?.name ?? ''}`}
                     </span>
                   </span>

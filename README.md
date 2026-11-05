@@ -22,10 +22,15 @@ A private, offline personal budgeting app. It's a Progressive Web App you instal
   3. how you've categorised that merchant before (it learns from the ones you choose or approve)
   4. a built-in list of common Australian merchants (Woolworths, Coles, BP, Ampol, Netflix, Synergy, Telstra, Bupa, Uber Eats and so on)
 
+  **Once you approve or choose a category for a merchant, the rest follow:** other pending transactions from the same merchant get the same category straight away, tagged **auto** ("Same as one you approved"). That happens on the import screen and in the To review list, and for future imports too. Store numbers are ignored, so "WOOLWORTHS 4021 PERTH" and "WOOLWORTHS 1234 PERTH" match. A different branch name, such as "WOOLWORTHS MIDLAND", is asked about once. If you've put the same merchant in different categories before, it goes back to suggesting. A transaction you deliberately set back to Uncategorised is left alone.
+
   Obvious matches are applied automatically and tagged **rule**, **transfer** or **auto**. When it's less sure, it shows **"Suggested: X"**: tap **Approve**, or choose a different category. **Approve all** handles a whole import at once.
 - **To review list:** uncategorised transactions, including ones imported earlier, appear under **Transactions → To review** with suggestions. A badge on the Transactions tab shows how many are waiting.
 - **Rules:** when you choose a different category, the app offers to make it a rule and apply it to matching uncategorised transactions.
 - **Transfers between your own accounts:** "Transfer to/from xxNNNN" to an account you've marked as yours goes in **Transfers**. That category isn't counted as spending or income. The review screen asks about account numbers it hasn't seen before.
+- **Outgoings donut chart:** the inner ring splits spending into **Necessary** (blue) and **Unnecessary** (orange). The outer ring shows the categories within each. Spending that isn't categorised yet is grey, under "Not sorted yet". Choose **Month**, **Quarter**, **6 months** or **Year** (calendar periods) and step back and forward with the arrows. Tap a slice to see its amount in the middle, or a row to open its transactions.
+  - Each spending category is marked Necessary or Unnecessary. Tap the label in **Settings → Categories** to switch it. The defaults are: necessary for Rent/Mortgage, Bills, Insurance, Groceries, Fuel and Childcare; unnecessary for Eating Out, Entertainment and Other.
+  - To override a single transaction, open it and choose **Necessary** or **Unnecessary**.
 - **Monthly budgets per category**, plus a dashboard showing:
   - spending vs budget for the month
   - income, spending and net
