@@ -7,7 +7,8 @@ import { centsToInput, dollarsToCents } from '../lib/money';
 import type { Category, Transaction } from '../lib/types';
 import { useStore } from '../store';
 import { RulePrompt } from './RulePrompt';
-import { CategorySelect, Sheet } from './ui';
+import { CategoryPicker } from './CategoryPicker';
+import { Sheet } from './ui';
 
 export const MANUAL_ACCOUNT_ID = 'manual';
 
@@ -20,12 +21,16 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
   const [amount, setAmount] = useState(tx ? centsToInput(tx.amount) : '');
   const [direction, setDirection] = useState<'out' | 'in'>(tx && tx.amount > 0 ? 'in' : 'out');
   const [categoryId, setCategoryId] = useState<string | null>(tx?.categoryId ?? null);
+  // True when the category came from approving the app's suggestion.
+  const [approved, setApproved] = useState(false);
   const [accountId, setAccountId] = useState(tx?.accountId ?? accounts[0]?.id ?? MANUAL_ACCOUNT_ID);
   const [notes, setNotes] = useState(tx?.notes ?? '');
   const [rulePrompt, setRulePrompt] = useState<{ description: string; category: Category } | null>(null);
   const [error, setError] = useState('');
 
   const cents = dollarsToCents(amount);
+  const signed = cents ? (direction === 'out' ? -cents : cents) : 0;
+  const suggestion = description.trim() ? store.suggest(description, signed) : null;
   const fromStatement = tx !== null && tx.source !== 'manual';
 
   async function save() {
@@ -43,6 +48,8 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
       description: description.trim(),
       amount: direction === 'out' ? -cents : cents,
       categoryId,
+      categorySource:
+        categoryId === null ? undefined : categoryId === tx?.categoryId ? (tx.categorySource ?? 'user') : 'user',
       accountId,
       notes: notes.trim() || undefined,
     } as Transaction;
@@ -52,7 +59,7 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
 
     const changed = categoryId && categoryId !== (tx?.categoryId ?? null);
     const cat = categories.find((c) => c.id === categoryId);
-    if (changed && cat) {
+    if (changed && cat && !approved) {
       setRulePrompt({ description: saved.description, category: cat });
     } else onClose();
   }
@@ -132,10 +139,23 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
         <span>Date</span>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </label>
-      <label className="field">
+      <div className="field">
         <span>Category</span>
-        <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
-      </label>
+        <CategoryPicker
+          categories={categories}
+          value={categoryId}
+          source={categoryId === tx?.categoryId ? tx?.categorySource : 'user'}
+          suggestion={suggestion}
+          onApprove={(id) => {
+            setCategoryId(id);
+            setApproved(true);
+          }}
+          onChange={(id) => {
+            setCategoryId(id);
+            setApproved(false);
+          }}
+        />
+      </div>
       <label className="field">
         <span>Account</span>
         <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>

@@ -8,9 +8,10 @@ import { rowsToSave, type ReviewBatch, type ReviewRow } from '../lib/importer';
 import type { Category } from '../lib/types';
 import { useStore } from '../store';
 import { RulePrompt } from './RulePrompt';
-import { Amount, CategorySelect, Icon, Sheet } from './ui';
+import { CategoryPicker } from './CategoryPicker';
+import { Amount, Icon, Sheet } from './ui';
 
-type Tab = 'new' | 'check' | 'dupes';
+type Tab = 'new' | 'suggested' | 'check' | 'dupes';
 
 export function Review({
   initial,
@@ -36,7 +37,15 @@ export function Review({
   const toSave = fresh.filter((r) => !r.removed);
   const check = fresh.filter((r) => r.warnings.length > 0);
   const dupes = all.filter((r) => r.duplicate);
-  const shown = tab === 'new' ? fresh : tab === 'check' ? check : dupes;
+  const pending = toSave.filter((r) => !r.categoryId && r.suggestion);
+  const autoCount = toSave.filter((r) => r.categoryId && r.categorySource && r.categorySource !== 'user').length;
+  const unsorted = toSave.filter((r) => !r.categoryId && !r.suggestion).length;
+  const shown = tab === 'new' ? fresh : tab === 'suggested' ? pending : tab === 'check' ? check : dupes;
+
+  function approveAll() {
+    const ids = new Set(pending.map((r) => r.rowId));
+    updateRows((r) => (ids.has(r.rowId) ? { ...r, categoryId: r.suggestion!.categoryId, categorySource: 'user' } : r));
+  }
   const transfersId = categories.find((c) => c.kind === 'transfer')?.id ?? null;
 
   // Accounts mentioned as "Transfer to/from xxNNNN" that we haven't asked about yet.
@@ -63,13 +72,15 @@ export function Review({
     await store.reload();
     if (mine && transfersId) {
       updateRows((r) =>
-        r.categoryId === null && transferSuffix(r.description) === suffix ? { ...r, categoryId: transfersId } : r,
+        r.categoryId === null && transferSuffix(r.description) === suffix
+          ? { ...r, categoryId: transfersId, categorySource: 'transfer' }
+          : r,
       );
     }
   }
 
   function changeCategory(row: ReviewRow, categoryId: string | null) {
-    updateRow(row.rowId, { categoryId });
+    updateRow(row.rowId, { categoryId, categorySource: categoryId ? 'user' : undefined });
     const cat = categories.find((c) => c.id === categoryId);
     if (cat) setRulePrompt({ row, category: cat });
   }
@@ -101,6 +112,12 @@ export function Review({
         {dupes.length > 0 && <> · {dupes.length} duplicate{dupes.length === 1 ? '' : 's'} skipped</>}
         {fresh.length - toSave.length > 0 && <> · {fresh.length - toSave.length} removed</>}
       </p>
+      {toSave.length > 0 && (
+        <p className="hint">
+          {autoCount} categorised automatically · {pending.length} suggestion{pending.length === 1 ? '' : 's'} to approve
+          {unsorted > 0 && <> · {unsorted} with no guess</>}
+        </p>
+      )}
 
       {fileErrors.map((e) => (
         <div key={e.fileName} className="banner error">
@@ -165,15 +182,24 @@ export function Review({
 
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'new'} onClick={() => setTab('new')}>
-          New ({fresh.length})
+          All ({fresh.length})
+        </button>
+        <button role="tab" aria-selected={tab === 'suggested'} onClick={() => setTab('suggested')}>
+          Suggested ({pending.length})
         </button>
         <button role="tab" aria-selected={tab === 'check'} onClick={() => setTab('check')}>
           Check ({check.length})
         </button>
         <button role="tab" aria-selected={tab === 'dupes'} onClick={() => setTab('dupes')}>
-          Duplicates ({dupes.length})
+          Dupes ({dupes.length})
         </button>
       </div>
+
+      {pending.length > 0 && (tab === 'new' || tab === 'suggested') && (
+        <button className="btn wide approve-all" onClick={approveAll}>
+          <Icon name="check" size={18} /> Approve all {pending.length} suggestion{pending.length === 1 ? '' : 's'}
+        </button>
+      )}
 
       {shown.length === 0 && <p className="hint center">Nothing here.</p>}
       <ul className="review-list">
@@ -196,9 +222,12 @@ export function Review({
             </button>
             {!r.duplicate && (
               <div className="review-actions">
-                <CategorySelect
+                <CategoryPicker
                   categories={categories}
                   value={r.categoryId}
+                  source={r.categorySource}
+                  suggestion={r.suggestion}
+                  onApprove={(id) => updateRow(r.rowId, { categoryId: id, categorySource: 'user' })}
                   onChange={(id) => changeCategory(r, id)}
                 />
                 <button
@@ -248,7 +277,7 @@ export function Review({
             if (apply) {
               updateRows((r) =>
                 r.categoryId === null && ruleMatches({ pattern } as never, r.description)
-                  ? { ...r, categoryId: rulePrompt.category.id }
+                  ? { ...r, categoryId: rulePrompt.category.id, categorySource: 'rule' }
                   : r,
               );
             }

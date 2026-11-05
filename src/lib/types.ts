@@ -14,12 +14,39 @@ export interface Account {
 
 export type CategoryKind = 'expense' | 'income' | 'transfer';
 
+export type BuiltinCategory =
+  | 'groceries'
+  | 'rent'
+  | 'fuel'
+  | 'bills'
+  | 'insurance'
+  | 'eating-out'
+  | 'entertainment'
+  | 'childcare'
+  | 'other'
+  | 'income'
+  | 'transfers';
+
+/**
+ * How a transaction got its category:
+ * - user: chosen or approved by you (used for learning)
+ * - rule: one of your rules matched
+ * - transfer: transfer between your own accounts
+ * - auto: the app was confident and applied it (shown with an "auto" tag)
+ */
+export type CategorySource = 'user' | 'rule' | 'transfer' | 'auto';
+
 export interface Category {
   id: string;
   name: string;
   kind: CategoryKind;
   /** System categories (e.g. Transfers) can be renamed but not deleted. */
   system?: boolean;
+  /**
+   * Stable key for the built-in categories (e.g. "groceries"), so the
+   * built-in merchant list keeps working after a category is renamed.
+   */
+  builtin?: BuiltinCategory;
   order: number;
 }
 
@@ -35,6 +62,8 @@ export interface Transaction {
   /** Running balance after this transaction, when the source provides it. */
   balance?: Cents;
   categoryId: string | null;
+  /** Missing on transactions saved before this field existed – treated as 'user'. */
+  categorySource?: CategorySource;
   dedupeKey: string;
   source: 'pdf' | 'csv' | 'manual';
   notes?: string;

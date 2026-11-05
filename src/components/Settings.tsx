@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { makeBackup, readBackup } from '../lib/backup';
-import { categorise } from '../lib/categorise';
 import * as db from '../lib/db';
 import { formatDate, todayISO } from '../lib/dates';
 import { newId } from '../lib/id';
@@ -197,13 +196,13 @@ function Rules() {
   }
 
   async function reapply() {
+    // Apply only confident guesses; the rest stay in the "To review" list as suggestions.
     const changed = store.transactions
       .filter((t) => t.categoryId === null)
-      .map((t) => ({
-        ...t,
-        categoryId: categorise(t.description, store.rules, store.categories, store.settings.ownAccountSuffixes),
-      }))
-      .filter((t) => t.categoryId !== null);
+      .flatMap((t) => {
+        const s = store.suggest(t.description, t.amount);
+        return s?.confident ? [{ ...t, categoryId: s.categoryId, categorySource: s.source }] : [];
+      });
     await db.putTransactions(changed);
     await store.reload();
     store.toast(`Categorised ${changed.length} transaction${changed.length === 1 ? '' : 's'}`);
@@ -213,8 +212,10 @@ function Rules() {
     <section className="card">
       <h3>Auto-categorise rules</h3>
       <p className="hint">
-        If a description contains the text (any case), it gets that category. Longer matches win. Rules beat
-        automatic transfer detection.
+        If a description contains the text (any case), it gets that category. Longer matches win. Rules come first,
+        then transfers between your accounts, then what you've categorised before, then a built-in list of common
+        merchants. Strong matches are applied automatically (tagged “auto”); weaker ones are suggested for you to
+        approve.
       </p>
       <ul className="settings-list">
         {rules.map((r) => (
@@ -247,7 +248,7 @@ function Rules() {
         </button>
       </div>
       <button className="btn wide" onClick={reapply}>
-        Apply rules to uncategorised transactions
+        Auto-categorise uncategorised transactions
       </button>
     </section>
   );

@@ -1,8 +1,10 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { newId } from './id';
+import { BUILTIN_NAMES } from './suggest';
 import {
   DEFAULT_SETTINGS,
   type Account,
+  type BuiltinCategory,
   type Budget,
   type Category,
   type Rule,
@@ -28,22 +30,39 @@ export const STORES = ['accounts', 'transactions', 'categories', 'rules', 'budge
 const DB_NAME = 'guhvnah-budget';
 
 export function defaultCategories(): Category[] {
-  const expense = [
-    'Groceries',
-    'Rent/Mortgage',
-    'Fuel',
-    'Bills',
-    'Insurance',
-    'Eating Out',
-    'Entertainment',
-    'Childcare',
-    'Other',
+  const expense: [string, BuiltinCategory][] = [
+    ['Groceries', 'groceries'],
+    ['Rent/Mortgage', 'rent'],
+    ['Fuel', 'fuel'],
+    ['Bills', 'bills'],
+    ['Insurance', 'insurance'],
+    ['Eating Out', 'eating-out'],
+    ['Entertainment', 'entertainment'],
+    ['Childcare', 'childcare'],
+    ['Other', 'other'],
   ];
   return [
-    ...expense.map((name, order) => ({ id: newId(), name, kind: 'expense' as const, order })),
-    { id: newId(), name: 'Income', kind: 'income', order: expense.length },
-    { id: newId(), name: 'Transfers', kind: 'transfer', system: true, order: expense.length + 1 },
+    ...expense.map(([name, builtin], order) => ({ id: newId(), name, kind: 'expense' as const, builtin, order })),
+    { id: newId(), name: 'Income', kind: 'income', builtin: 'income', order: expense.length },
+    { id: newId(), name: 'Transfers', kind: 'transfer', builtin: 'transfers', system: true, order: expense.length + 1 },
   ];
+}
+
+/**
+ * Data saved before categories had a `builtin` key: match the default
+ * categories up by their original name. Returns the categories that changed.
+ */
+export function tagBuiltins(categories: Category[]): Category[] {
+  const changed: Category[] = [];
+  for (const [key, name] of Object.entries(BUILTIN_NAMES) as [BuiltinCategory, string][]) {
+    if (categories.some((c) => c.builtin === key)) continue;
+    const c = categories.find((x) => !x.builtin && x.name.toLowerCase() === name.toLowerCase());
+    if (c) {
+      c.builtin = key;
+      changed.push(c);
+    }
+  }
+  return changed;
 }
 
 function defaultRules(cats: Category[]): Rule[] {
@@ -109,6 +128,12 @@ export async function loadAll(): Promise<AllData> {
   ]);
   const settings: Settings = { ...DEFAULT_SETTINGS };
   for (const row of settingRows) (settings as unknown as Record<string, unknown>)[row.key] = row.value;
+  const tagged = tagBuiltins(categories);
+  if (tagged.length) {
+    const tx = db.transaction('categories', 'readwrite');
+    for (const c of tagged) tx.store.put(c);
+    await tx.done;
+  }
   transactions.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
   categories.sort((a, b) => a.order - b.order);
   return { accounts, transactions, categories, rules, budgets, settings };

@@ -17,7 +17,8 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 ];
 
 export default function App() {
-  const { ready, error, toastMessage } = useStore();
+  const { ready, error, toastMessage, transactions } = useStore();
+  const toReview = transactions.filter((t) => t.categoryId === null).length;
   const [tab, setTab] = useState<Tab>('home');
   const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [filters, setFilters] = useState<TxFilters>(NO_FILTERS);
@@ -57,7 +58,14 @@ export default function App() {
       <nav className="bottom-nav">
         {TABS.map((t) => (
           <button key={t.id} aria-current={tab === t.id ? 'page' : undefined} onClick={() => go(t.id)}>
-            <Icon name={t.icon} />
+            <span className="nav-icon">
+              <Icon name={t.icon} />
+              {t.id === 'transactions' && toReview > 0 && (
+                <span className="nav-badge" aria-label={`${toReview} to review`}>
+                  {toReview > 99 ? '99+' : toReview}
+                </span>
+              )}
+            </span>
             <span>{t.label}</span>
           </button>
         ))}

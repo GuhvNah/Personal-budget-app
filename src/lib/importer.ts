@@ -1,14 +1,18 @@
-import { categorise } from './categorise';
 import { dedupeKeys } from './dedupe';
 import type { AllData } from './db';
 import { newId } from './id';
-import type { Account, Transaction } from './types';
+import { suggestCategory, type History, type Suggestion } from './suggest';
+import type { Account, CategorySource, Transaction } from './types';
 import type { ParsedAccount, ParsedTransaction } from '../parsers/types';
 
 export interface ReviewRow extends ParsedTransaction {
   rowId: string;
   accountId: string;
   categoryId: string | null;
+  /** How categoryId was set; undefined while uncategorised. */
+  categorySource?: CategorySource;
+  /** The app's best guess (kept for confident ones too, to show the reason). */
+  suggestion: Suggestion | null;
   dedupeKey: string;
   /** Already saved, or repeated earlier in this same import. */
   duplicate: boolean;
@@ -38,13 +42,13 @@ export function defaultAccountName(acc: ParsedAccount, bank: string): string {
 /**
  * Turn parsed transactions into review rows: work out dedupe keys, mark
  * duplicates (against the database and earlier rows in the same import) and
- * auto-categorise.
+ * categorise: confident guesses are applied, others are left as suggestions.
  */
 export function buildRows(
   parsed: ParsedTransaction[],
   accountId: string,
   source: 'pdf' | 'csv',
-  data: Pick<AllData, 'rules' | 'categories' | 'settings'>,
+  data: Pick<AllData, 'rules' | 'categories' | 'settings'> & { history: History },
   existingKeys: Set<string>,
   seenInImport: Set<string>,
 ): ReviewRow[] {
@@ -52,12 +56,20 @@ export function buildRows(
   return parsed.map((p, i) => {
     const duplicate = existingKeys.has(keys[i]) || seenInImport.has(keys[i]);
     seenInImport.add(keys[i]);
+    const suggestion = suggestCategory(p.description, p.amount, {
+      rules: data.rules,
+      categories: data.categories,
+      ownSuffixes: data.settings.ownAccountSuffixes,
+      history: data.history,
+    });
     return {
       ...p,
       warnings: [...p.warnings],
       rowId: newId(),
       accountId,
-      categoryId: categorise(p.description, data.rules, data.categories, data.settings.ownAccountSuffixes),
+      categoryId: suggestion?.confident ? suggestion.categoryId : null,
+      categorySource: suggestion?.confident ? suggestion.source : undefined,
+      suggestion,
       dedupeKey: keys[i],
       duplicate,
       removed: false,
@@ -81,6 +93,7 @@ export function rowsToSave(batches: ReviewBatch[]): Transaction[] {
         amount: r.amount,
         balance: r.balance,
         categoryId: r.categoryId,
+        categorySource: r.categoryId ? (r.categorySource ?? 'user') : undefined,
         dedupeKey: r.dedupeKey,
         source: r.source,
         createdAt: now + i,

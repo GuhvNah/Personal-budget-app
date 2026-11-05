@@ -16,7 +16,15 @@ A private, offline personal budgeting app. It's a Progressive Web App you instal
 - **CSV import** for any bank, with a column-mapping step. It auto-detects the CommBank CSV layout and supports one signed amount column or separate debit/credit columns.
 - **Review before saving:** fix the date, description or amount, change categories, remove lines, or cancel the whole import.
 - **Categories:** Groceries, Rent/Mortgage, Fuel, Bills, Insurance, Eating Out, Entertainment, Childcare, Other, Income and Transfers. Add, rename and delete them in Settings. Deleting asks where to move the transactions.
-- **Rules:** "description contains X → category". When you change a transaction's category, the app offers to make it a rule and apply it to matching uncategorised transactions.
+- **Automatic categorising**, worked out on the phone in this order:
+  1. your rules ("description contains X → category")
+  2. transfers between your own accounts
+  3. how you've categorised that merchant before (it learns from the ones you choose or approve)
+  4. a built-in list of common Australian merchants (Woolworths, Coles, BP, Ampol, Netflix, Synergy, Telstra, Bupa, Uber Eats and so on)
+
+  Obvious matches are applied automatically and tagged **rule**, **transfer** or **auto**. When it's less sure, it shows **"Suggested: X"**: tap **Approve**, or choose a different category. **Approve all** handles a whole import at once.
+- **To review list:** uncategorised transactions, including ones imported earlier, appear under **Transactions → To review** with suggestions. A badge on the Transactions tab shows how many are waiting.
+- **Rules:** when you choose a different category, the app offers to make it a rule and apply it to matching uncategorised transactions.
 - **Transfers between your own accounts:** "Transfer to/from xxNNNN" to an account you've marked as yours goes in **Transfers**. That category isn't counted as spending or income. The review screen asks about account numbers it hasn't seen before.
 - **Monthly budgets per category**, plus a dashboard showing:
   - spending vs budget for the month
