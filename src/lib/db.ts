@@ -228,3 +228,10 @@ export async function saveSettings(s: Settings) {
   for (const [key, value] of Object.entries(s)) tx.store.put({ key, value });
   await tx.done;
 }
+
+export async function deleteTransactions(ids: string[]) {
+  const db = await getDB();
+  const tx = db.transaction('transactions', 'readwrite');
+  for (const id of ids) tx.store.delete(id);
+  await tx.done;
+}

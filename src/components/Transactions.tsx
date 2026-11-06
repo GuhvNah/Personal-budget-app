@@ -143,6 +143,7 @@ export function Transactions({
                       {t.categoryId ? catName.get(t.categoryId) : 'Uncategorised'}
                       {t.categoryId && t.categorySource === 'auto' && <span className="tag">auto</span>}
                       {t.necessity && <span className={`tag ${t.necessity}`}>{t.necessity}</span>}
+                      {t.pending && <span className="tag pending">pending</span>}
                       {accounts.length > 1 && ` · ${accounts.find((a) => a.id === t.accountId)?.name ?? ''}`}
                     </span>
                   </span>

@@ -9,6 +9,7 @@ import type { Category, CategoryKind, Necessity } from '../lib/types';
 import { useStore } from '../store';
 import { choiceSummary, commitChoice } from './ApplySheet';
 import { planRetro } from '../lib/retro';
+import { CaptureSettings } from './CaptureSettings';
 import { CategorySelect, Icon, Sheet } from './ui';
 
 const LAST_BACKUP = 'lastBackup';
@@ -26,6 +27,7 @@ export function Settings() {
       <Budgets />
       <Rules />
       <Accounts />
+      <CaptureSettings />
       <Backup />
       <About />
     </div>

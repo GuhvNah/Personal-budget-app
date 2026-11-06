@@ -35,6 +35,11 @@ A private, offline personal budgeting app. It's a Progressive Web App you instal
 - **Outgoings donut chart:** the inner ring splits spending into **Necessary** (blue) and **Unnecessary** (orange). The outer ring shows the categories within each. Spending that isn't categorised yet is grey, under "Not sorted yet". Choose **Month**, **Quarter**, **6 months** or **Year** (calendar periods) and step back and forward with the arrows. Tap a slice to see its amount in the middle, or a row to open its transactions.
   - Each spending category is marked Necessary or Unnecessary. Tap the label in **Settings → Categories** to switch it. The defaults are: necessary for Rent/Mortgage, Bills, Insurance, Groceries, Fuel and Childcare; unnecessary for Eating Out, Entertainment and Other.
   - To override a single transaction, open it and choose **Necessary** or **Unnecessary**.
+- **Real-time capture of phone payments** (optional). The free Android app **MacroDroid** watches for Google Wallet (or CommBank) payment notifications and opens this app with the amount and shop. The purchase is recorded straight away as **pending** and categorised.
+  - When you later import a statement containing it (same amount, date within a few days), the bank's version replaces it and keeps your category, necessary/unnecessary setting and notes.
+  - If both Google Wallet and CommBank notify for the same purchase, it's only counted once.
+  - The details travel in the link's `#fragment`, which is never sent to any server, and a private key stops other apps or websites adding purchases.
+  - Set it up in **Settings → Real-time capture**, which has step-by-step MacroDroid instructions, your link and a tester.
 - **Monthly budgets per category**, plus a dashboard showing:
   - spending vs budget for the month
   - income, spending and net

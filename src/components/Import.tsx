@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { accountIdFor, buildRows, defaultAccountName, type ReviewBatch } from '../lib/importer';
+import { accountIdFor, attachCaptures, buildRows, defaultAccountName, type ReviewBatch } from '../lib/importer';
 import { newId } from '../lib/id';
 import { guessMapping, parseCSV, type CsvMapping } from '../parsers/csv';
 import { pdfToPages } from '../parsers/pdfText';
@@ -69,7 +69,7 @@ export function Import({ onDone }: { onDone(): void }) {
       }
     }
     if (batches.length === 0) setState({ step: 'pick', errors });
-    else setState({ step: 'review', batches, errors });
+    else setState({ step: 'review', batches: attachCaptures(batches, store.transactions), errors });
   }
 
   async function importCsv(file: File) {
@@ -92,7 +92,7 @@ export function Import({ onDone }: { onDone(): void }) {
       warnings: [],
       rows: buildRows(txs, id, 'csv', store, new Set(store.transactions.map((t) => t.dedupeKey)), new Set()),
     };
-    setState({ step: 'review', batches: [batch], errors: [] });
+    setState({ step: 'review', batches: attachCaptures([batch], store.transactions), errors: [] });
   }
 
   if (state.step === 'working') {

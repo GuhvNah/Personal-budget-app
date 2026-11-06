@@ -3,7 +3,7 @@ import { mentionedSuffixes, transferSuffix } from '../lib/categorise';
 import * as db from '../lib/db';
 import { formatDate } from '../lib/dates';
 import { centsToInput, dollarsToCents, formatAUD } from '../lib/money';
-import { applyToSimilar, rowsToSave, type ReviewBatch, type ReviewRow } from '../lib/importer';
+import { applyToSimilar, replacedCaptureIds, rowsToSave, type ReviewBatch, type ReviewRow } from '../lib/importer';
 import type { Category } from '../lib/types';
 import { useStore } from '../store';
 import { ApplySheet, choiceSummary, commitChoice } from './ApplySheet';
@@ -114,6 +114,8 @@ export function Review({
       await db.saveSettings({ ...settings, ownAccountSuffixes: [...own] });
       const txs = rowsToSave(batches);
       await db.putTransactions(txs);
+      // Statement lines replace the pending purchases captured from notifications.
+      await db.deleteTransactions(replacedCaptureIds(batches));
       const similar = await store.reload();
       store.toast(
         `Saved ${txs.length} transaction${txs.length === 1 ? '' : 's'}${similar ? ` · ${similar} older similar ones categorised` : ''}`,
@@ -234,6 +236,9 @@ export function Review({
               <span className="review-line2">
                 {formatDate(r.date)}
                 {r.duplicate && <span className="pill">Already imported – skipped</span>}
+                {!r.duplicate && r.replacesCapture && (
+                  <span className="pill">Replaces pending “{r.replacesCapture.description}”</span>
+                )}
               </span>
               {r.warnings.map((w, k) => (
                 <span key={k} className="status warning">
