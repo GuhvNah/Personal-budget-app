@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeBackup, readBackup } from './backup';
-import { categorise, mentionedSuffixes, suggestPattern, transferSuffix } from './categorise';
+import { categorise, mentionedSuffixes, ruleMatches, samePattern, suggestPattern, transferSuffix } from './categorise';
 import { addMonths, formatDate, parseDate, parseDayMonthName } from './dates';
 import { dedupeKeys } from './dedupe';
 import { buildRows, rowsToSave } from './importer';
@@ -57,6 +57,34 @@ const cats: Category[] = [
   { id: 'xfer', name: 'Transfers', kind: 'transfer', order: 4, system: true },
 ];
 const rule = (pattern: string, categoryId: string): Rule => ({ id: pattern, pattern, categoryId, createdAt: 0 });
+
+describe('rule matching is not case-sensitive', () => {
+  it.each([
+    ['aldi', 'ALDI STORES MIDLAND'],
+    ['ALDI', 'Aldi Stores'],
+    ['Budget Direct', 'Direct Debit 123456 BUDGET DIRECT'],
+    ['budget direct', 'Direct Debit 123456 BUDGET  DIRECT'], // extra space in description
+    ['budget direct', 'Direct Debit 123456 BUDGET\u00a0DIRECT'], // non-breaking space
+    ['  budget   direct ', 'Direct Debit 123456 BUDGET DIRECT'], // extra spaces in rule
+    ['cafe', 'THE CORNER CAFÉ'], // accents ignored
+    ['café', 'the corner cafe'],
+    ['\uff43\uff4f\uff4c\uff45\uff53', 'COLES 123'], // full-width pasted text
+  ])('%j matches %j', (pattern, description) => {
+    expect(ruleMatches({ pattern }, description)).toBe(true);
+  });
+  it('still needs the text to be there', () => {
+    expect(ruleMatches({ pattern: 'aldi' }, 'COLES')).toBe(false);
+    expect(ruleMatches({ pattern: '   ' }, 'anything')).toBe(false);
+  });
+  it('treats rules differing only in case or spacing as the same rule', () => {
+    expect(samePattern('ALDI', ' aldi ')).toBe(true);
+    expect(samePattern('Budget  Direct', 'BUDGET DIRECT')).toBe(true);
+    expect(samePattern('ALDI', 'ALDI STORES')).toBe(false);
+  });
+  it('categorise uses the same matching', () => {
+    expect(categorise('Direct Debit 1 BUDGET\u00a0DIRECT', [rule('budget direct', 'ins')], cats, [])).toBe('ins');
+  });
+});
 
 describe('categorise', () => {
   const rules = [rule('ALDI', 'groc'), rule('budget direct', 'ins'), rule('xx5555', 'mort')];
