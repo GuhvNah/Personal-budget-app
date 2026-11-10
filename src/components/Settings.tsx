@@ -251,7 +251,7 @@ function Rules() {
     <section className="card">
       <h3>Auto-categorise rules</h3>
       <p className="hint">
-        If a description contains the text (any case), it gets that category. Longer matches win. Rules come first,
+        If a description contains the text, it gets that category. Rules aren't case-sensitive, and extra spaces and accents are ignored (“aldi” matches “ALDI STORES”, “cafe” matches “CAFÉ”). Longer matches win. Rules come first,
         then transfers between your accounts, then what you've categorised before, then a built-in list of common
         merchants. Strong matches are applied automatically (tagged “auto”); weaker ones are suggested for you to
         approve.

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { matchText } from '../lib/categorise';
 import { formatDate } from '../lib/dates';
 import { dollarsToCents, formatAUD } from '../lib/money';
 import type { Transaction } from '../lib/types';
@@ -29,11 +30,11 @@ export const NO_FILTERS: TxFilters = {
 };
 
 export function filterTransactions(txs: Transaction[], q: string, f: TxFilters): Transaction[] {
-  const query = q.trim().toLowerCase();
+  const query = matchText(q);
   const min = dollarsToCents(f.min);
   const max = dollarsToCents(f.max);
   return txs.filter((t) => {
-    if (query && !`${t.description} ${t.notes ?? ''} ${t.reference ?? ''}`.toLowerCase().includes(query))
+    if (query && !matchText(`${t.description} ${t.notes ?? ''} ${t.reference ?? ''}`).includes(query))
       return false;
     if (f.from && t.date < f.from) return false;
     if (f.to && t.date > f.to) return false;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import * as db from '../lib/db';
 import { newId } from '../lib/id';
 import { planRetro, retroSource } from '../lib/retro';
-import { suggestPattern } from '../lib/categorise';
+import { ruleMatches, samePattern, suggestPattern } from '../lib/categorise';
 import { hasMerchant, type MatchBy } from '../lib/retro';
 import { merchantKeys } from '../lib/suggest';
 import type { Category } from '../lib/types';
@@ -45,7 +45,7 @@ export function ApplySheet({
   const [makeRule, setMakeRule] = useState(!merchantOk);
   const [pattern, setPattern] = useState(() => suggestPattern(description));
   const p = pattern.trim();
-  const ruleValid = p.length >= 2 && description.toLowerCase().includes(p.toLowerCase());
+  const ruleValid = p.length >= 2 && ruleMatches({ pattern: p }, description);
   const by: MatchBy | null = makeRule ? (ruleValid ? { pattern: p } : null) : merchantOk ? { merchantOf: description } : null;
   const counts = by ? plan(by, includeManual) : { change: 0, manual: 0 };
   const skipped = includeManual ? 0 : counts.manual;
@@ -148,11 +148,17 @@ export async function commitChoice(
   categoryId: string,
   excludeId?: string,
 ): Promise<number> {
+  const { transactions, rules } = await db.loadAll();
   if (choice.rule) {
-    await db.putRule({ id: newId(), pattern: choice.rule, categoryId, createdAt: Date.now() });
+    // Rules aren't case-sensitive, so "aldi" and "ALDI" are the same rule: update it rather than add a twin.
+    const existing = rules.find((r) => samePattern(r.pattern, choice.rule!));
+    await db.putRule(
+      existing
+        ? { ...existing, categoryId }
+        : { id: newId(), pattern: choice.rule, categoryId, createdAt: Date.now() },
+    );
   }
   if (!choice.applyExisting) return 0;
-  const { transactions } = await db.loadAll();
   const { change } = planRetro(transactions, choice.by, categoryId, (t) => t.id === excludeId, choice.includeManual);
   await db.putTransactions(change.map((t) => ({ ...t, categoryId, categorySource: retroSource(choice.by) })));
   return change.length;

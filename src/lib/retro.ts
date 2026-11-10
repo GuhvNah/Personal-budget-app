@@ -7,7 +7,7 @@ export type MatchBy = { merchantOf: string } | { pattern: string };
 
 export function matches(description: string, by: MatchBy): boolean {
   return 'pattern' in by
-    ? ruleMatches({ pattern: by.pattern } as never, description)
+    ? ruleMatches({ pattern: by.pattern }, description)
     : sameMerchant(description, by.merchantOf);
 }
 

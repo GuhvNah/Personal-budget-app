@@ -16,9 +16,29 @@ export function mentionedSuffixes(descriptions: string[]): string[] {
   return [...set].sort();
 }
 
-export function ruleMatches(rule: Rule, description: string): boolean {
-  const p = rule.pattern.trim().toLowerCase();
-  return p !== '' && description.toLowerCase().includes(p);
+/**
+ * Text as rules compare it: not case-sensitive, accents removed ("CAFÉ" ->
+ * "cafe"), full-width/compatibility characters folded, and any run of
+ * whitespace (including non-breaking spaces) treated as one space.
+ */
+export function matchText(s: string): string {
+  return s
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Does the description contain the rule's text? Not case-sensitive (see matchText). */
+export function ruleMatches(rule: Pick<Rule, 'pattern'>, description: string): boolean {
+  const p = matchText(rule.pattern);
+  return p !== '' && matchText(description).includes(p);
+}
+
+/** Two rule texts that would match exactly the same things. */
+export function samePattern(a: string, b: string): boolean {
+  return matchText(a) === matchText(b);
 }
 
 /**
