@@ -119,6 +119,10 @@ const PATHS: Record<string, string> = {
   check: 'M5 12l5 5L20 7',
   edit: 'M4 20h4L19 9l-4-4L4 16v4z',
   undo: 'M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-3',
+  chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  up: 'M12 19V5M5 12l7-7 7 7',
+  down: 'M12 5v14M5 12l7 7 7-7',
+  lock: 'M6 11h12v10H6zM8 11V7a4 4 0 018 0v4',
 };
 
 export function Icon({ name, size = 24 }: { name: keyof typeof PATHS | string; size?: number }) {

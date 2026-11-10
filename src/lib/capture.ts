@@ -152,3 +152,12 @@ export function matchCaptured<T extends Pick<Transaction, 'id' | 'amount' | 'dat
   });
   return out;
 }
+
+/**
+ * Captured purchases still pending after `days` days: they probably won't
+ * be matched by a statement (e.g. the payment was reversed, or the amount
+ * posted differently), so the user should keep or delete them.
+ */
+export function stalePending<T extends Pick<Transaction, 'pending' | 'date'>>(txs: T[], today: ISODate, days = 10): T[] {
+  return txs.filter((t) => t.pending && daysBetween(t.date, today) > days);
+}

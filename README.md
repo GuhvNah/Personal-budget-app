@@ -40,10 +40,18 @@ A private, offline personal budgeting app. It's a Progressive Web App you instal
   - If both Google Wallet and CommBank notify for the same purchase, it's only counted once.
   - The details travel in the link's `#fragment`, which is never sent to any server, and a private key stops other apps or websites adding purchases.
   - Set it up in **Settings → Real-time capture**, which has step-by-step MacroDroid instructions, your link and a tester.
-- **Monthly budgets per category**, plus a dashboard showing:
-  - spending vs budget for the month
-  - income, spending and net
-  - a 6-month spending chart (tap a bar to jump to that month)
+- **Monthly budgets with pace.** For the current month, Home shows what's left of your budgets and roughly how much a day that is. Each budgeted category shows the same. A category with several purchases that's running ahead of an even pace for the day of the month gets a warning.
+- **Dashboard (Home):** income, spending and net for the month, spending vs budget, the Outgoings chart, and a 6-month spending chart (tap a bar to jump to that month).
+- **Insights tab:**
+  - **Account balances:** the latest balance of each account, taken from your statements, with a chart over 3 months, 6 months, a year or all time.
+  - **Savings goals:** set a target balance for an account, such as your offset, with an optional date. Progress follows the account's balance each time you import a statement.
+  - **Regular payments:** bills and subscriptions found automatically (same merchant, steady interval and amount, at least 3 times). It shows the estimated next date and the monthly cost, and flags when an amount has gone up or down.
+  - **Trends:** each category's spending for a month, compared with the month before and its recent average.
+- **Undo:** changes that touch many transactions show an **Undo** button for a few seconds. That covers updating existing transactions, Approve all, adding or deleting a rule, deleting a category or account, restoring a backup, and deleting a transaction.
+- **Export to CSV:** tap **Export CSV** on the Transactions list to export what's currently shown (after search and filters), or export everything from Settings → Backup.
+- **App lock (optional, off by default):** a PIN, your phone's fingerprint, or either. It's asked for when the app opens and again after it has been in the background for a while. It keeps other people out of the app on your unlocked phone. It doesn't encrypt the stored data. A forgotten PIN can't be recovered: the lock screen lets you erase the app's data, after which you restore a backup.
+- **Update banner:** when a new version has been downloaded, a "Tap to update" banner appears at the top.
+- **Old pending purchases:** a captured purchase still pending after 10 days is flagged on the Transactions tab so you can keep or delete it.
 - **Transactions list:** search, filter by date range, category, account, money in/out and amount range, and add transactions manually.
 - **Backup and restore** of all data as a JSON file (download it, or share it straight to Google Drive).
 
@@ -59,6 +67,7 @@ Needs Node.js 20+.
 npm install
 npm run dev        # http://localhost:5173 (the service worker is only active in production builds)
 npm test           # parser and logic tests
+npm run e2e        # builds, then runs the phone-browser tests (needs: npx playwright install chromium)
 npm run build      # production build into dist/
 npm run preview    # serve the production build at http://localhost:4173
 ```

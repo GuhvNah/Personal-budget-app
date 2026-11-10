@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
 import { matchText } from '../lib/categorise';
-import { formatDate } from '../lib/dates';
+import { stalePending } from '../lib/capture';
+import { formatDate, todayISO } from '../lib/dates';
+import { downloadText, transactionsToCsv } from '../lib/exportCsv';
 import { dollarsToCents, formatAUD } from '../lib/money';
 import type { Transaction } from '../lib/types';
 import { useStore } from '../store';
 import { ReviewQueue } from './ReviewQueue';
+import { StalePendingSheet } from './StalePending';
 import { TransactionEditor } from './TransactionEditor';
 import { Amount, Empty, Icon, Sheet } from './ui';
 
@@ -58,12 +61,15 @@ export function Transactions({
   filters: TxFilters;
   setFilters(f: TxFilters): void;
 }) {
-  const { transactions, categories, accounts } = useStore();
+  const store = useStore();
+  const { transactions, categories, accounts } = store;
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Transaction | null | 'new'>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const [queue, setQueue] = useState(false);
+  const [showStale, setShowStale] = useState(false);
+  const stale = useMemo(() => stalePending(transactions, todayISO()), [transactions]);
   const toReview = useMemo(() => transactions.filter((t) => t.categoryId === null).length, [transactions]);
 
   const catName = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
@@ -94,6 +100,15 @@ export function Transactions({
           <Icon name="right" />
         </button>
       )}
+      {stale.length > 0 && (
+        <button className="review-banner stale" onClick={() => setShowStale(true)}>
+          <span>
+            <b>{stale.length}</b> old pending purchase{stale.length === 1 ? '' : 's'} to check
+            <small>Pending for over 10 days with no matching statement line</small>
+          </span>
+          <Icon name="right" />
+        </button>
+      )}
       <div className="toolbar sticky">
         <label className="search">
           <Icon name="search" size={20} />
@@ -117,11 +132,24 @@ export function Transactions({
       {transactions.length > 0 && (
         <p className="result-summary">
           {results.length} transaction{results.length === 1 ? '' : 's'} · net {formatAUD(total)}
-          {activeFilters > 0 && (
-            <button className="link" onClick={() => setFilters(NO_FILTERS)}>
-              Clear filters
-            </button>
-          )}
+          <span className="summary-actions">
+            {activeFilters > 0 && (
+              <button className="link" onClick={() => setFilters(NO_FILTERS)}>
+                Clear filters
+              </button>
+            )}
+            {results.length > 0 && (
+              <button
+                className="link"
+                onClick={() => {
+                  downloadText(`budget-transactions-${todayISO()}.csv`, transactionsToCsv(results, categories, accounts));
+                  store.toast(`Exported ${results.length} transaction${results.length === 1 ? '' : 's'}`);
+                }}
+              >
+                Export CSV
+              </button>
+            )}
+          </span>
         </p>
       )}
 
@@ -168,6 +196,7 @@ export function Transactions({
       {editing && (
         <TransactionEditor tx={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
       )}
+      {showStale && stale.length > 0 && <StalePendingSheet items={stale} onClose={() => setShowStale(false)} />}
       {showFilters && (
         <FilterSheet
           value={filters}

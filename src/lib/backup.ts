@@ -47,5 +47,7 @@ export function readBackup(text: string): AllData {
     rules: arr(raw.rules, 'rules') as AllData['rules'],
     budgets: arr(raw.budgets, 'budgets') as AllData['budgets'],
     settings: { ...DEFAULT_SETTINGS, ...((raw.settings as object) ?? {}) },
+    // Backups made before savings goals existed have none.
+    goals: Array.isArray(raw.goals) ? (raw.goals as AllData['goals']) : [],
   };
 }

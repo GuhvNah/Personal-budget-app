@@ -103,6 +103,18 @@ export interface Budget {
   amount: Cents;
 }
 
+/** A savings goal that follows an account's balance (e.g. your offset account). */
+export interface Goal {
+  id: string;
+  name: string;
+  /** Target balance, positive cents. */
+  target: Cents;
+  accountId: string;
+  /** Optional date you want to reach it by. */
+  targetDate?: ISODate;
+  createdAt: number;
+}
+
 export interface Settings {
   /** Last 4 digits of account numbers that belong to the user (e.g. "1111"). */
   ownAccountSuffixes: string[];

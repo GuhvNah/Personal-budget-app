@@ -13,12 +13,24 @@ interface StoreValue extends AllData {
    * approved). Returns how many were auto-categorised.
    */
   reload(): Promise<number>;
-  toast(message: string): void;
+  /** Show a short message. With `action` it stays longer and shows a button (e.g. Undo). */
+  toast(message: string, action?: ToastAction): void;
   toastMessage: string | null;
+  toastAction: ToastAction | null;
+  /**
+   * Call before a change that touches many records. Returns a function that
+   * puts everything back exactly as it was – pass it to toast() as an Undo.
+   */
+  undoPoint(): Promise<ToastAction>;
   /** What you've categorised before, for learning. */
   history: History;
   /** The app's best category guess for a description/amount. */
   suggest(description: string, amount: number): Suggestion | null;
+}
+
+export interface ToastAction {
+  label: string;
+  run(): void | Promise<void>;
 }
 
 const empty: AllData = {
@@ -28,6 +40,7 @@ const empty: AllData = {
   rules: [],
   budgets: [],
   settings: DEFAULT_SETTINGS,
+  goals: [],
 };
 
 const Ctx = createContext<StoreValue | null>(null);
@@ -36,7 +49,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AllData>(empty);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toastMessage, setToast] = useState<string | null>(null);
+  const [toastState, setToast] = useState<{ message: string; action?: ToastAction } | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -53,6 +66,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       setData(loaded);
       setReady(true);
+      setError(null);
       return applied.length;
     } catch (e) {
       setError(
@@ -63,15 +77,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const onBlocked = () =>
+      setError('The app has been updated, but an older copy is still open in another tab or window. Close it, then reopen this one.');
+    window.addEventListener(db.DB_BLOCKED, onBlocked);
     void reload();
     // Ask the browser not to evict our data under storage pressure.
     void navigator.storage?.persist?.();
   }, [reload]);
 
-  const toast = useCallback((message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast((m) => (m === message ? null : m)), 3000);
+  const toast = useCallback((message: string, action?: ToastAction) => {
+    const next = { message, action };
+    setToast(next);
+    window.setTimeout(() => setToast((cur) => (cur === next ? null : cur)), action ? 8000 : 3000);
   }, []);
+
+  const undoPoint = useCallback(async (): Promise<ToastAction> => {
+    const before = await db.loadAll();
+    return {
+      label: 'Undo',
+      run: async () => {
+        await db.replaceAll(before);
+        await reload();
+        toast('Undone');
+      },
+    };
+  }, [reload, toast]);
 
   const history = useMemo(() => buildHistory(data.transactions), [data.transactions]);
   const suggest = useCallback(
@@ -86,7 +116,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <Ctx.Provider value={{ ...data, ready, error, reload, toast, toastMessage, history, suggest }}>
+    <Ctx.Provider
+      value={{
+        ...data,
+        ready,
+        error,
+        reload,
+        toast,
+        toastMessage: toastState?.message ?? null,
+        toastAction: toastState?.action ?? null,
+        undoPoint,
+        history,
+        suggest,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );

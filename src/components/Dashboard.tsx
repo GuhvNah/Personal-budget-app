@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { addMonths, formatMonth, todayISO } from '../lib/dates';
+import { budgetPace } from '../lib/insights';
 import { formatAUD } from '../lib/money';
 import { budgetRows, recentMonths, summariseMonth } from '../lib/stats';
 import { useStore } from '../store';
@@ -33,7 +34,8 @@ export function Dashboard({
   goImport(): void;
 }) {
   const { transactions, categories, budgets } = useStore();
-  const thisMonth = todayISO().slice(0, 7);
+  const today = todayISO();
+  const thisMonth = today.slice(0, 7);
 
   const summary = useMemo(() => summariseMonth(month, transactions, categories), [month, transactions, categories]);
   const rows = useMemo(() => budgetRows(summary, categories, budgets), [summary, categories, budgets]);
@@ -48,6 +50,17 @@ export function Dashboard({
     [month, thisMonth, transactions, categories],
   );
   const totalBudget = budgets.reduce((s, b) => s + b.amount, 0);
+  // How many purchases each category has this month (for the pace warning).
+  const purchases = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of transactions) {
+      if (t.date.slice(0, 7) === month && t.amount < 0) m.set(t.categoryId ?? '', (m.get(t.categoryId ?? '') ?? 0) + 1);
+    }
+    return m;
+  }, [transactions, month]);
+  // Overall pace counts only spending in categories that have a budget.
+  const budgetedSpend = rows.filter((r) => r.budget > 0).reduce((s, r) => s + r.spent, 0);
+  const overall = budgetPace(budgetedSpend, totalBudget, month, today);
   const net = summary.income - summary.spending;
 
   if (transactions.length === 0) {
@@ -98,6 +111,20 @@ export function Dashboard({
 
       <section className="card">
         <h3>Spending vs budget</h3>
+        {overall && (
+          <p className="pace-summary">
+            {overall.left >= 0 ? (
+              <>
+                <b>{formatAUD(overall.left, { whole: true })}</b> of your budgets left for the next {overall.daysLeft} day
+                {overall.daysLeft === 1 ? '' : 's'}, about <b>{formatAUD(overall.perDay, { whole: true })}</b> a day.
+              </>
+            ) : (
+              <>
+                You're <b>{formatAUD(-overall.left, { whole: true })}</b> over your budgets this month.
+              </>
+            )}
+          </p>
+        )}
         {rows.length === 0 ? (
           <p className="hint">No spending this month. Set budgets in Settings.</p>
         ) : (
@@ -105,6 +132,7 @@ export function Dashboard({
             {rows.map((r) => {
               const over = r.budget > 0 && r.spent > r.budget;
               const pct = r.budget > 0 ? Math.min(100, (Math.max(r.spent, 0) / r.budget) * 100) : 0;
+              const pace = budgetPace(r.spent, r.budget, month, today, purchases.get(r.category?.id ?? '') ?? 0);
               return (
                 <li key={r.category?.id ?? 'none'}>
                   <button
@@ -132,6 +160,13 @@ export function Dashboard({
                     {over ? (
                       <span className="status critical">
                         <Icon name="alert" size={16} /> Over by {formatAUD(r.spent - r.budget, { whole: true })}
+                      </span>
+                    ) : pace ? (
+                      <span className={`status ${pace.status === 'ahead' ? 'warning' : ''}`}>
+                        {pace.status === 'ahead' && <Icon name="alert" size={16} />}
+                        {formatAUD(pace.left, { whole: true })} left · {pace.daysLeft} day{pace.daysLeft === 1 ? '' : 's'} to
+                        go · about {formatAUD(pace.perDay, { whole: true })} a day
+                        {pace.status === 'ahead' ? ' · ahead of pace for this point in the month' : ''}
                       </span>
                     ) : r.budget > 0 ? (
                       <span className="status">{formatAUD(r.budget - r.spent, { whole: true })} left</span>
