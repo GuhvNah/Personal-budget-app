@@ -65,10 +65,12 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
       notes: notes.trim() || undefined,
       necessity,
     } as Transaction;
+    const undo = await store.undoPoint();
     await db.putTransactions([saved]);
     const similar = await store.reload();
     store.toast(
       `${tx ? 'Transaction updated' : 'Transaction added'}${similar ? ` · ${similar} similar categorised too` : ''}`,
+      undo,
     );
 
     const changed = categoryId && categoryId !== (tx?.categoryId ?? null);
@@ -79,10 +81,11 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
   }
 
   async function remove() {
-    if (!tx || !confirm('Delete this transaction?')) return;
+    if (!tx) return;
+    const undo = await store.undoPoint();
     await db.deleteTransaction(tx.id);
     await store.reload();
-    store.toast('Transaction deleted');
+    store.toast('Transaction deleted', undo);
     onClose();
   }
 
@@ -97,10 +100,11 @@ export function TransactionEditor({ tx, onClose }: { tx: Transaction | null; onC
           return { change: r.change.length, manual: r.manual };
         }}
         onConfirm={async (choice) => {
+          const undo = await store.undoPoint();
           const changed = await commitChoice(choice, category.id, saved.id);
           await store.reload();
           const msg = choiceSummary(changed, choice.rule);
-          if (msg) store.toast(msg);
+          if (msg) store.toast(msg, undo);
         }}
         onClose={onClose}
       />

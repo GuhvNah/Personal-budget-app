@@ -25,22 +25,23 @@ export function ReviewQueue({ onBack }: { onBack(): void }) {
   const withSuggestion = items.filter((i) => i.suggestion);
 
   async function setCategory(tx: Transaction, categoryId: string | null, viaApprove: boolean) {
+    const undo = await store.undoPoint();
     await db.putTransactions([
       { ...tx, categoryId, categorySource: categoryId ? (viaApprove ? 'approved' : 'user') : undefined },
     ]);
     const similar = await store.reload();
-    if (similar) store.toast(`Also categorised ${similar} similar transaction${similar === 1 ? '' : 's'}`);
+    if (similar) store.toast(`Also categorised ${similar} similar transaction${similar === 1 ? '' : 's'}`, undo);
     const cat = categories.find((c) => c.id === categoryId);
     if (!viaApprove && cat) setApplyPrompt({ tx, category: cat });
   }
 
   async function approveAll() {
-    if (!confirm(`Approve all ${withSuggestion.length} suggested categories?`)) return;
+    const undo = await store.undoPoint();
     await db.putTransactions(
       withSuggestion.map(({ tx, suggestion }) => ({ ...tx, categoryId: suggestion!.categoryId, categorySource: 'approved' })),
     );
     await store.reload();
-    store.toast(`Approved ${withSuggestion.length}`);
+    store.toast(`Approved ${withSuggestion.length} suggestion${withSuggestion.length === 1 ? '' : 's'}`, undo);
   }
 
   return (
@@ -106,10 +107,11 @@ export function ReviewQueue({ onBack }: { onBack(): void }) {
             return { change: r.change.length, manual: r.manual };
           }}
           onConfirm={async (choice) => {
+            const undo = await store.undoPoint();
             const changed = await commitChoice(choice, applyPrompt.category.id, applyPrompt.tx.id);
             await store.reload();
             const msg = choiceSummary(changed, choice.rule);
-            if (msg) store.toast(msg);
+            if (msg) store.toast(msg, undo);
           }}
           onClose={() => setApplyPrompt(null)}
         />

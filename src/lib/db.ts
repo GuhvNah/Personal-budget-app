@@ -7,6 +7,7 @@ import {
   type BuiltinCategory,
   type Budget,
   type Category,
+  type Goal,
   type Rule,
   type Settings,
   type Transaction,
@@ -23,11 +24,14 @@ interface BudgetDB extends DBSchema {
   rules: { key: string; value: Rule };
   budgets: { key: string; value: Budget };
   settings: { key: string; value: { key: string; value: unknown } };
+  goals: { key: string; value: Goal };
 }
 
-export const STORES = ['accounts', 'transactions', 'categories', 'rules', 'budgets', 'settings'] as const;
+export const STORES = ['accounts', 'transactions', 'categories', 'rules', 'budgets', 'settings', 'goals'] as const;
 
 const DB_NAME = 'guhvnah-budget';
+/** Fired on window when a database upgrade is waiting for another open copy of the app to close. */
+export const DB_BLOCKED = 'budget-db-blocked';
 
 export function defaultCategories(): Category[] {
   const expense: [string, BuiltinCategory][] = [
@@ -87,8 +91,11 @@ function defaultRules(cats: Category[]): Rule[] {
 let dbPromise: Promise<IDBPDatabase<BudgetDB>> | null = null;
 
 export function getDB(): Promise<IDBPDatabase<BudgetDB>> {
-  dbPromise ??= openDB<BudgetDB>(DB_NAME, 1, {
-    upgrade(db, _old, _new, tx) {
+  dbPromise ??= openDB<BudgetDB>(DB_NAME, 2, {
+    upgrade(db, oldVersion, _new, tx) {
+      // Version 2 adds savings goals; existing data is left as it is.
+      if (oldVersion < 2) db.createObjectStore('goals', { keyPath: 'id' });
+      if (oldVersion >= 1) return;
       db.createObjectStore('accounts', { keyPath: 'id' });
       const t = db.createObjectStore('transactions', { keyPath: 'id' });
       t.createIndex('byDate', 'date');
@@ -103,6 +110,15 @@ export function getDB(): Promise<IDBPDatabase<BudgetDB>> {
       for (const c of cats) tx.objectStore('categories').put(c);
       for (const r of defaultRules(cats)) tx.objectStore('rules').put(r);
     },
+    // An older copy of the app (another tab) is holding the database open, so the upgrade can't start.
+    blocked() {
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event(DB_BLOCKED));
+    },
+    // A newer copy wants to upgrade: let go so it can, then pick up the new version.
+    blocking(_cur, _blocked, event) {
+      (event.target as IDBDatabase).close();
+      if (typeof window !== 'undefined') window.location.reload();
+    },
   });
   return dbPromise;
 }
@@ -114,17 +130,19 @@ export interface AllData {
   rules: Rule[];
   budgets: Budget[];
   settings: Settings;
+  goals: Goal[];
 }
 
 export async function loadAll(): Promise<AllData> {
   const db = await getDB();
-  const [accounts, transactions, categories, rules, budgets, settingRows] = await Promise.all([
+  const [accounts, transactions, categories, rules, budgets, settingRows, goals] = await Promise.all([
     db.getAll('accounts'),
     db.getAll('transactions'),
     db.getAll('categories'),
     db.getAll('rules'),
     db.getAll('budgets'),
     db.getAll('settings'),
+    db.getAll('goals'),
   ]);
   const settings: Settings = { ...DEFAULT_SETTINGS };
   for (const row of settingRows) (settings as unknown as Record<string, unknown>)[row.key] = row.value;
@@ -136,7 +154,8 @@ export async function loadAll(): Promise<AllData> {
   }
   transactions.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
   categories.sort((a, b) => a.order - b.order);
-  return { accounts, transactions, categories, rules, budgets, settings };
+  goals.sort((a, b) => a.createdAt - b.createdAt);
+  return { accounts, transactions, categories, rules, budgets, settings, goals };
 }
 
 /** Replace everything in the database (used by backup restore). */
@@ -150,7 +169,15 @@ export async function replaceAll(data: AllData): Promise<void> {
   for (const r of data.rules) tx.objectStore('rules').put(r);
   for (const b of data.budgets) tx.objectStore('budgets').put(b);
   for (const [key, value] of Object.entries(data.settings)) tx.objectStore('settings').put({ key, value });
+  for (const g of data.goals) tx.objectStore('goals').put(g);
   await tx.done;
+}
+
+export async function putGoal(g: Goal) {
+  await (await getDB()).put('goals', g);
+}
+export async function deleteGoal(id: string) {
+  await (await getDB()).delete('goals', id);
 }
 
 export async function putAccount(a: Account) {

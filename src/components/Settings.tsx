@@ -10,6 +10,8 @@ import { useStore } from '../store';
 import { choiceSummary, commitChoice } from './ApplySheet';
 import { planRetro } from '../lib/retro';
 import { CaptureSettings } from './CaptureSettings';
+import { LockSettings } from './LockSettings';
+import { downloadText, transactionsToCsv } from '../lib/exportCsv';
 import { CategorySelect, Icon, Sheet } from './ui';
 
 const LAST_BACKUP = 'lastBackup';
@@ -28,6 +30,7 @@ export function Settings() {
       <Rules />
       <Accounts />
       <CaptureSettings />
+      <LockSettings />
       <Backup />
       <About />
     </div>
@@ -144,9 +147,10 @@ function DeleteCategory({ category, onClose }: { category: Category; onClose(): 
           <button
             className="btn danger grow"
             onClick={async () => {
+              const undo = await store.undoPoint();
               await db.deleteCategory(category.id, moveTo);
               await store.reload();
-              store.toast(`Deleted ${category.name}`);
+              store.toast(`Deleted ${category.name}`, undo);
               onClose();
             }}
           >
@@ -225,13 +229,14 @@ function Rules() {
 
   async function add() {
     if (!pattern.trim() || !categoryId) return;
+    const undo = await store.undoPoint();
     const changed = await commitChoice(
       { rule: pattern.trim(), applyExisting, by: { pattern: pattern.trim() }, includeManual },
       categoryId,
     );
     setPattern('');
     await store.reload();
-    store.toast(choiceSummary(changed, pattern.trim(), false));
+    store.toast(choiceSummary(changed, pattern.trim(), false), undo);
   }
 
   async function reapply() {
@@ -242,9 +247,10 @@ function Rules() {
         const s = store.suggest(t.description, t.amount);
         return s?.confident ? [{ ...t, categoryId: s.categoryId, categorySource: s.source }] : [];
       });
+    const undo = await store.undoPoint();
     await db.putTransactions(changed);
     await store.reload();
-    store.toast(`Categorised ${changed.length} transaction${changed.length === 1 ? '' : 's'}`);
+    store.toast(`Categorised ${changed.length} transaction${changed.length === 1 ? '' : 's'}`, changed.length ? undo : undefined);
   }
 
   return (
@@ -265,8 +271,10 @@ function Rules() {
               className="icon-btn"
               aria-label={`Delete rule ${r.pattern}`}
               onClick={async () => {
+                const undo = await store.undoPoint();
                 await db.deleteRule(r.id);
                 await store.reload();
+                store.toast(`Deleted rule “${r.pattern}”`, undo);
               }}
             >
               <Icon name="trash" />
@@ -365,10 +373,11 @@ function Accounts() {
                 className="icon-btn"
                 aria-label={`Delete ${a.name}`}
                 onClick={async () => {
-                  if (!confirm(`Delete ${a.name} and its ${n} transactions? This can't be undone.`)) return;
+                  if (!confirm(`Delete ${a.name} and its ${n} transactions?`)) return;
+                  const undo = await store.undoPoint();
                   await db.deleteAccount(a.id);
                   await store.reload();
-                  store.toast('Account deleted');
+                  store.toast(`Deleted ${a.name} and ${n} transaction${n === 1 ? '' : 's'}`, undo);
                 }}
               >
                 <Icon name="trash" />
@@ -421,8 +430,8 @@ function Backup() {
   const [last, setLast] = useState(() => localStorage.getItem(LAST_BACKUP));
 
   function backupFile(): File {
-    const { accounts, transactions, categories, rules, budgets, settings } = store;
-    const json = makeBackup({ accounts, transactions, categories, rules, budgets, settings });
+    const { accounts, transactions, categories, rules, budgets, settings, goals } = store;
+    const json = makeBackup({ accounts, transactions, categories, rules, budgets, settings, goals });
     return new File([json], `budget-backup-${todayISO()}.json`, { type: 'application/json' });
   }
   function markDone() {
@@ -461,9 +470,10 @@ function Backup() {
         )
       )
         return;
+      const undo = await store.undoPoint();
       await db.replaceAll(data);
       await store.reload();
-      store.toast('Backup restored');
+      store.toast('Backup restored', undo);
     } catch (e) {
       alert((e as Error).message);
     }
@@ -495,6 +505,23 @@ function Backup() {
       <button className="btn wide" onClick={() => file.current?.click()}>
         Restore from backup…
       </button>
+      <button
+        className="btn wide"
+        disabled={store.transactions.length === 0}
+        onClick={() => {
+          downloadText(
+            `budget-transactions-${todayISO()}.csv`,
+            transactionsToCsv(store.transactions, store.categories, store.accounts),
+          );
+          store.toast(`Exported ${store.transactions.length} transactions`);
+        }}
+      >
+        Export all transactions as CSV (spreadsheet)
+      </button>
+      <p className="hint">
+        The CSV is for spreadsheets or tax time. It can't be restored into the app. Use a backup for that. To export
+        only some transactions, filter the Transactions list and tap Export CSV there.
+      </p>
       <input
         ref={file}
         type="file"
@@ -522,6 +549,7 @@ function About() {
       rules: [],
       budgets: [],
       settings: { ownAccountSuffixes: [], notOwnAccountSuffixes: [] },
+      goals: [],
     });
     await store.reload();
     store.toast('All data erased');

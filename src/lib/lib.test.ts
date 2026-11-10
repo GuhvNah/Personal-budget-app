@@ -229,7 +229,13 @@ describe('backup', () => {
     rules: [],
     budgets: [{ categoryId: 'groc', amount: 50000 }],
     settings: { ownAccountSuffixes: ['1111'], notOwnAccountSuffixes: [] },
+    goals: [{ id: 'g', name: 'Buffer', target: 1000000, accountId: 'a', createdAt: 2 }],
   };
+  it('reads older backups without goals', () => {
+    const old = JSON.parse(makeBackup(data));
+    delete old.goals;
+    expect(readBackup(JSON.stringify(old)).goals).toEqual([]);
+  });
   it('round-trips', () => {
     expect(readBackup(makeBackup(data))).toEqual(data);
   });

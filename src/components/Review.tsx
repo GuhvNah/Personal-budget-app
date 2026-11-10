@@ -311,10 +311,12 @@ export function Review({
               const source = retroSource(choice.by);
               updateRows((r) => (ids.has(r.rowId) ? { ...r, categoryId: id, categorySource: source } : r));
             }
-            changed += await commitChoice(choice, id);
+            const undo = await store.undoPoint();
+            const savedChanged = await commitChoice(choice, id);
+            changed += savedChanged;
             await store.reload();
             const msg = choiceSummary(changed, choice.rule);
-            if (msg) store.toast(msg);
+            if (msg) store.toast(msg, savedChanged || choice.rule ? undo : undefined);
           }}
           onClose={() => setApplyPrompt(null)}
         />
